@@ -1,0 +1,13 @@
+[project]
+name = "hes-hackathon"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "av<19",
+    "faster-whisper>=1.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+]
