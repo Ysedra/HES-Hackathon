@@ -8,17 +8,6 @@ The main research question is **how far we can reduce verification latency throu
 
 This repository currently documents the project plan. The features and architecture below describe intended behaviour, not completed functionality or measured performance. Model choices, installation instructions, and benchmarks will be added as implementation progresses.
 
-## Setup
-
-The project uses [uv](https://docs.astral.sh/uv/) and Python 3.12.
-
-```bash
-uv sync
-uv run python asr/test_asr.py path/to/audio.wav --language en
-```
-
-For notebooks, select the `.venv` interpreter as the kernel. Models are downloaded from Hugging Face on first use.
-
 ## User experience
 
 A user watches a video while its transcript appears underneath. The system checks factual claims asynchronously and highlights the relevant transcript passages. Selecting a checked passage reveals the claim, a short explanation, the evidence excerpt, and its source URL.
