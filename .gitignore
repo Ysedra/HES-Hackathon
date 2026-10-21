@@ -9,3 +9,9 @@ dist/
 build/
 *.egg-info/
 .cache/
+app.db
+app.db-wal
+app.db-shm
+*.db
+*.db-wal
+*.db-shm
