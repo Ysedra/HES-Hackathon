@@ -7,7 +7,9 @@ authors = [
     { name = "Alex", email = "alexis.kueny@outlook.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "sqlite-vec>=0.1.9",
+]
 
 [project.scripts]
 hes-hackathon = "hes_hackathon:main"
