@@ -1,6 +1,11 @@
 [project]
 name = "hes-hackathon"
 version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Alex", email = "alexis.kueny@outlook.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
     "av<19",
@@ -8,6 +13,7 @@ dependencies = [
     "faster-whisper>=1.2.1",
     "jiwer>=4.0.0",
     "sounddevice>=0.5.6",
+    "sqlite-vec>=0.1.9",
     "torch>=2.14.1",
     "torchcodec>=0.17.0",
     "transformers>=5.20.2",
@@ -17,3 +23,10 @@ dependencies = [
 dev = [
     "ipykernel>=7.4.0",
 ]
+
+[project.scripts]
+hes-hackathon = "hes_hackathon:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
