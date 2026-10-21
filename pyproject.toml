@@ -4,7 +4,12 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "av<19",
+    "datasets>=5.1.0",
     "faster-whisper>=1.2.1",
+    "jiwer>=4.0.0",
+    "torch>=2.14.1",
+    "torchcodec>=0.17.0",
+    "transformers>=5.20.2",
 ]
 
 [dependency-groups]
