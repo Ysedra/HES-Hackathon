@@ -4,9 +4,7 @@ A HES-SO 301/302 hackathon project investigating how quickly a lightweight local
 
 The main research question is **how far we can reduce verification latency through model optimisation, restricted retrieval, caching, and parallel processing while preserving verification quality**. We aim for sub-second verification where feasible, particularly for claims whose verification results are already cached.
 
-## Status
-
-This repository currently documents the project plan. The features and architecture below describe intended behaviour, not completed functionality or measured performance. Model choices, installation instructions, and benchmarks will be added as implementation progresses.
+This document describes the proposed system, the division of work, and the milestones planned for 19–23 October.
 
 ## User experience
 
@@ -29,9 +27,8 @@ Missing evidence produces an uncertain result rather than a false verdict. The i
 - Restrict web retrieval to a small, configurable source allowlist and a defined topic scope.
 - Keep the application practical for the professor's laptop, with a bounded cache and modest model footprint.
 - Store useful evidence passages rather than entire websites, large knowledge dumps, or permanent video recordings.
-- Measure performance on documented hardware before claiming that a latency target has been achieved.
 
-Exact models, sources, topic scope, and storage limits remain implementation decisions.
+The AI baseline uses `cross-encoder/nli-MiniLM2-L6-H768`. English is the initial language. The topic scope, source allowlist, and cache size still need to be agreed. The current baseline searches the open web; restricted retrieval is planned for a later comparison.
 
 ## Architecture
 
@@ -57,9 +54,9 @@ Transcription continues while verification runs. Claim IDs and video timestamps 
 
 ### AI service
 
-One AI service owns checkability detection, claim extraction, embedding generation, and evidence assessment. It may contain several specialised local models behind one interface. The database does not need a separate NLP agent.
+The AI component receives text and returns whether it is checkable, a verdict, evidence references, and timings. The baseline uses simple rules to filter obvious questions, commands, and opinions, then an NLI model to compare evidence with the claim. These rules have limitations and need to be evaluated.
 
-The service distinguishes opinions from checkable claims, requests evidence from the retrieval component, and returns structured verdicts with evidence references. Model scores must be evaluated before being presented as confidence estimates.
+For now, inputs must be standalone sentences with explicit subjects. Splitting transcript segments into separate claims and resolving references such as “he” or “it” remain integration tasks. 
 
 ### Retrieval and caching
 
@@ -86,6 +83,20 @@ The cache has a configurable size limit and eviction policy. Retrieval concurren
 
 Establish a baseline first, then measure each optimisation against the same evaluation material.
 
+## Weekly milestones
+
+The schedule for 19–23 October focuses on getting the first baseline connected. The dates below are planning targets.
+
+| Day | Date | Planned work | Expected output |
+| --- | --- | --- | --- |
+| Monday | 19 Oct | Define the revised scope, divide responsibilities, and agree what data the components exchange | Initial architecture and task allocation |
+| Tuesday | 20 Oct | Investigate transcription, storage, and claim-verification options | Initial technical choices for each workstream |
+| Wednesday | 21 Oct | Develop the three components in separate notebooks and start connecting transcription to storage | First component implementations and initial integration |
+| Thursday | 22 Oct | Connect transcript input, retrieval, and cited verification and start optimisation | First complete baseline run with stage timings |
+| Friday | 23 Oct | Run a small fixed set of examples and review the verdicts and citations | Terminal or notebook demonstration and first baseline measurements |
+
+After the baseline, we will compare claim caching, evidence caching, and then inference and pipeline optimisations. Each change will be measured against the same examples. Dates for this next phase will be confirmed after the first integration run.
+
 ## Evaluation
 
 Verification latency starts when a complete, stable claim becomes available and ends when its verdict is available for display. Separately measure caption delay and the end-to-end delay from the spoken claim's completion to the displayed verdict.
@@ -109,17 +120,19 @@ The evaluation set should contain supported and contradicted claims, opinions, a
 
 ## Team organisation
 
-| Workstream | Responsibilities |
-| --- | --- |
-| Audio and transcription | Video/audio ingestion, local speech model, timestamps, transcript stability, and transcription latency |
-| Storage and parallel processing | Database, caches, retrieval, indexing, queues, concurrency, and retrieval measurements |
-| AI and verification | Claim detection, context resolution, embeddings, evidence assessment, model selection, and quality evaluation |
+| Workstream | Responsibilities | Assignee |
+| --- | --- | --- |
+| Audio and transcription | Video/audio ingestion, local speech model, timestamps, transcript stability, and transcription latency | Ünal |
+| Storage and parallel processing | Database, caches, retrieval, indexing, queues, concurrency, and retrieval measurements | Alexis |
+| AI and verification | Claim detection, context resolution, embeddings, evidence assessment, model selection, and quality evaluation | Youssef |
 
-Agree on shared event formats and interfaces early so each workstream can develop independently. Integration, the minimal interface, and final benchmarks are shared responsibilities.
+Each team member develops their component in a separate notebook. The next integration step is to agree the transcript and claim fields passed between components, including identifiers and timestamps. Integration, the demonstration, and final benchmarks are shared responsibilities.
+Following the initial project files, we will collaborate on connecting the feature sets together and how and where to expand after analysis of each others codes and program capabilities.
+
 
 ## Course contribution
 
 - **301:** compare local neural models and inference configurations, evaluate claim detection and evidence verification, and measure the quality/latency trade-off.
 - **302:** process a continuous stream using bounded queues, parallel retrieval, indexing, cache policies, provenance tracking, and resource-aware execution.
 
-The deliverable is a reproducible optimisation study supported by a working demonstration. Sub-second performance on every new claim remains a target to investigate rather than an assumed capability.
+The deliverable is a reproducible optimisation study supported by a working demonstration. Sub-second performance on every new claim remains a target to investigate.

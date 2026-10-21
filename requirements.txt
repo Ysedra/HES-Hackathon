@@ -1,0 +1,8 @@
+# Intel Macs only have official PyTorch wheels up to 2.2.2.
+# NumPy 2.x is incompatible with that build.
+numpy==1.26.4
+torch==2.2.2
+transformers==4.46.3
+ddgs==9.16.0
+trafilatura==2.3.1
+ipykernel==7.4.0
