@@ -7,6 +7,17 @@ samples/
 models/
 *.db
 *.csv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+.env
+.DS_Store
+dist/
+build/
+*.egg-info/
+.cache/
 app.db
 app.db-wal
 app.db-shm
