@@ -21,19 +21,12 @@ dependencies = [
     "torchcodec>=0.17.0",
     "transformers>=5.20.2",
     "ddgs==9.16.0",
-    # PyTorch 2.2.2 is the last official release supporting Intel Macs;
-    # that build also requires NumPy 1.x.
-    "numpy==1.26.4",
-    "sqlite-vec==0.1.9",
-    "torch==2.2.2",
     "trafilatura==2.3.1",
-    "transformers==4.46.3",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.4.0",
-    "ipykernel==7.4.0",
 ]
 
 [project.scripts]
