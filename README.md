@@ -40,6 +40,30 @@ uv sync
 
 In VS Code, select `.venv/bin/python` as the notebook kernel. Project dependencies are declared in `pyproject.toml`; `uv.lock` records the resolved environment used by the team.
 
+### V1: verified-claim cache
+
+Run `ai_agent_v1.ipynb` from the repository root in a fresh `.venv` kernel. It reuses V0's checkability/NLI decision function and the database schema, then adds exact whitespace-normalised claim lookup, expiry, verifier-version isolation, stored citations/scores/warnings, and a bounded cache. Supported/contradicted results with citations are eligible even when an unrelated page fails. Fatal search failures, uncertain results and non-checkable inputs are not cached.
+
+The persistent experiment cache is `database/v1_claim_cache.db`; its diagnostic-column migration is automatic. All three comparison passes (uncached, V1 cold, V1 warm) share the same search/download settings, including short socket timeouts, no automatic page retries, and a cooperative page-stage budget. Search tries DuckDuckGo and falls back once to Bing. Aggregate, cited-verdict, cache-hit and cache-miss timings are reported separately; failed searches print their errors and mark the pass incomplete. The cited-verdict sub-second rate counts all factual inputs, so fast failures cannot improve it. The original unrestricted V0 notebook remains unchanged. Independent live searches can still return different results. Previous live results are retained in `benchmarks/v1_before_retrieval_fix.json` and `benchmarks/v1_after_cache_fix.json`.
+
+The evidence rows in V1 are stored citations, not an evidence/RAG retrieval cache. The frontend's local API adapter remains a separate integration step.
+
+### Claim extraction experiment
+
+`claim_extraction.ipynb` evaluates a local model before verification. The 0.5B Qwen model produced valid JSON but remained unreliable on opinions and ambiguous references after two prompt revisions; recorded findings are kept in the notebook. The next candidate selected is Qwen2.5-1.5B-Instruct, whose quality still needs evaluation. It uses the same dependencies and functions, with roughly 6 GB of float32 weights in memory plus runtime overhead. Restart the notebook kernel before switching models.
+
+The extractor takes stable transcript segments plus optional recent context and returns claim strings and a context-needed flag. Python attaches the supplied stable window IDs (`provenance: "input_window"`); these are broad window links, not exact source spans. The notebook includes the original examples, broader development cases, and extraction timings. It does not verify truth or use caches. The original `ai_agent.ipynb` remains the V0 verifier baseline. The first load of a new model downloads its weights; CPU inference may take several seconds or longer.
+
+### Frontend preview
+
+The local interface is dependency-free. Start a static server from the repository root:
+
+```bash
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Then open [http://localhost:8000/frontend/](http://localhost:8000/frontend/). The interface has five planned pipeline configurations, microphone recording, text/media input, separate transcript segments and claims, an evidence inspector, and per-version results. **Try interface demo** uses explicitly labelled fixtures, not real inference or benchmarks. Live transcription and verification require the local `/api/analyse` adapter or scoped SSE events; the static server alone does not provide them. See `frontend/README.md` for the integration contract.
+
 ## Architecture
 
 ```mermaid
