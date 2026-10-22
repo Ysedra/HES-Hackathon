@@ -19,10 +19,9 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from api_helpers import require_version, stream
+from api_helpers import FrontendFiles, require_version, stream
 from pipeline import Pipeline
 from schemas import RunMetadata, TextRequest
 from versions import VERSIONS
@@ -86,4 +85,4 @@ async def analyse_media(media: UploadFile, metadata: Annotated[str, Form()], req
 
 
 # Mounted last so /api routes take priority
-app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")
+app.mount("/", FrontendFiles(directory=FRONTEND, html=True), name="frontend")

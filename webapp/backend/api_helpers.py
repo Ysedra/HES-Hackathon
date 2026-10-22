@@ -10,12 +10,23 @@ import anyio
 from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from pipeline import Run
 from schemas import Event, RunMetadata
 from versions import Version, get_version
 
 log = logging.getLogger("main")
+
+
+class FrontendFiles(StaticFiles):
+    """The frontend's static files, revalidated on every load ("no-cache"), so the browser never
+    keeps running an old app.js after an edit. Unchanged files are still answered with a quick 304."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def require_version(version_id) -> Version:
