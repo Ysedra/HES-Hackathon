@@ -86,6 +86,18 @@ The cache has a configurable size limit and eviction policy. Retrieval concurren
 
 Establish a baseline first, then measure each optimisation against the same evaluation material.
 
+## Weekly milestones
+
+Working days for the week of 19 to 23 October 2026, aligned with the MVP plan above.
+
+| Day | Date | Milestone |
+| --- | --- | --- |
+| Monday | 19 Oct | Agree shared event formats and interfaces |
+| Tuesday | 20 Oct | Transcription service + database + claim validation service R&D |
+| Wednesday | 21 Oct | Transcription + DB + claim validation developement, DB and transcription integration |
+| Thursday | 22 Oct | Functional baseline: retrieval and cited verification connected end to end, with latency logged |
+| Friday | 23 Oct | Terminal or structured-event demonstration, with first baseline latency numbers |
+
 ## Evaluation
 
 Verification latency starts when a complete, stable claim becomes available and ends when its verdict is available for display. Separately measure caption delay and the end-to-end delay from the spoken claim's completion to the displayed verdict.
@@ -109,11 +121,11 @@ The evaluation set should contain supported and contradicted claims, opinions, a
 
 ## Team organisation
 
-| Workstream | Responsibilities |
-| --- | --- |
-| Audio and transcription | Video/audio ingestion, local speech model, timestamps, transcript stability, and transcription latency |
-| Storage and parallel processing | Database, caches, retrieval, indexing, queues, concurrency, and retrieval measurements |
-| AI and verification | Claim detection, context resolution, embeddings, evidence assessment, model selection, and quality evaluation |
+| Workstream | Responsibilities | Assignee |
+| --- | --- | --- |
+| Audio and transcription | Video/audio ingestion, local speech model, timestamps, transcript stability, and transcription latency | Ünal |
+| Storage and parallel processing | Database, caches, retrieval, indexing, queues, concurrency, and retrieval measurements | Alexis |
+| AI and verification | Claim detection, context resolution, embeddings, evidence assessment, model selection, and quality evaluation | Youssef |
 
 Agree on shared event formats and interfaces early so each workstream can develop independently. Integration, the minimal interface, and final benchmarks are shared responsibilities.
 
