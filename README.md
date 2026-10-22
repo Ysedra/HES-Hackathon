@@ -46,7 +46,7 @@ Run `ai_agent_v1.ipynb` from the repository root in a fresh `.venv` kernel. It r
 
 The persistent experiment cache is `database/v1_claim_cache.db`; its diagnostic-column migration is automatic. All three comparison passes (uncached, V1 cold, V1 warm) share the same search/download settings, including short socket timeouts, no automatic page retries, and a cooperative page-stage budget. Search tries DuckDuckGo and falls back once to Bing. Aggregate, cited-verdict, cache-hit and cache-miss timings are reported separately; failed searches print their errors and mark the pass incomplete. The cited-verdict sub-second rate counts all factual inputs, so fast failures cannot improve it. The original unrestricted V0 notebook remains unchanged. Independent live searches can still return different results. Previous live results are retained in `benchmarks/v1_before_retrieval_fix.json` and `benchmarks/v1_after_cache_fix.json`.
 
-The evidence rows in V1 are stored citations, not an evidence/RAG retrieval cache. The frontend's local API adapter remains a separate integration step.
+The evidence rows in V1 are stored citations, not an evidence/RAG retrieval cache. The V1 verifier is not yet connected to the web backend.
 
 ### Claim extraction experiment
 
@@ -56,13 +56,34 @@ The extractor takes stable transcript segments plus optional recent context and 
 
 ### Frontend preview
 
-The local interface is dependency-free. Start a static server from the repository root:
+The FastAPI backend serves both the interface and the API on one port, so a single command starts the whole web app. From the repository root:
 
 ```bash
-python3 -m http.server 8000 --bind 127.0.0.1
+uv run fastapi dev webapp/backend/main.py
 ```
 
-Then open [http://localhost:8000/frontend/](http://localhost:8000/frontend/). The interface has five planned pipeline configurations, microphone recording, text/media input, separate transcript segments and claims, an evidence inspector, and per-version results. **Try interface demo** uses explicitly labelled fixtures, not real inference or benchmarks. Live transcription and verification require the local `/api/analyse` adapter or scoped SSE events; the static server alone does not provide them. See `frontend/README.md` for the integration contract.
+Wait for `Application startup complete` (Whisper loads first), then open [http://localhost:8000/](http://localhost:8000/). `fastapi dev` reloads the server when a backend file changes; after editing the frontend, refresh the page (Ctrl+F5 if the browser keeps an old `app.js`). Do not use `python -m http.server`: it serves the page but not the API, so the backend always appears disconnected.
+
+The status in the top bar polls `GET /api/health`: grey means the backend is not running or still loading, green means the selected version is implemented, and amber means the backend is running but not that version.
+
+The interface has five planned pipeline configurations, microphone recording, text/media input, separate transcript segments and claims, an evidence inspector, and per-version results. **Try interface demo** uses explicitly labelled fixtures, not real inference or benchmarks. See `webapp/frontend/README.md` for the integration contract.
+
+### Backend
+
+The backend runs the `pipeline_v0.ipynb` pipeline as the `baseline` version; other versions are rejected with HTTP 422. Every input becomes transcript segments, so typed text, microphone recordings and uploaded files then follow the same path: sentences, checkable claims, web search and NLI verification, then storage in `database/app.db` (created on startup if missing). The response is streamed: each transcript segment and claim reaches the dashboard as soon as it is ready, with claims shown as "Checking" until their verdict arrives, followed by the evidence, timings and running p50/p95 latency. The code is in `webapp/backend/`:
+
+| File | Role |
+| --- | --- |
+| `main.py` | Routes only: `GET /api/health`, `POST /api/analyse`, and the frontend's static files |
+| `schemas.py` | Request and response shapes, matching the frontend contract |
+| `versions.py` | The versions the backend implements, and which steps each enables |
+| `pipeline.py` | Runs the services in order for one request; loads the models once at startup |
+| `services/transcription.py` | faster-whisper in overlapping windows, for complete files/recordings and live loopback/microphone capture |
+| `services/extraction.py` | v0 rule-based extraction: sentence assembly and the checkability rules |
+| `services/verification.py` | v0 verifier: DuckDuckGo search, evidence passages, NLI verdict |
+| `services/storage.py` | The SQLite schema from `database.ipynb` and the run/claim/verdict writes |
+
+Services don't depend on HTTP, so notebooks can import them for benchmarks. Like v0, checking is sequential and each claim takes roughly 4–30 s, mostly web search and page downloads; the transcript also advances only between checks, so it lags behind the audio. Live capture (`transcribe_live`) is not yet exposed through an endpoint.
 
 ## Architecture
 

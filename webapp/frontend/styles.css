@@ -12,7 +12,7 @@ button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}a{color:var(
 .brand small{font-size:10px;letter-spacing:.08em;font-weight:650;color:var(--muted);border-left:1px solid var(--line);margin-left:10px;padding-left:18px}
 .header-note{color:var(--muted);font-size:12px}
 .connection{font-size:11px;color:var(--muted);margin-left:auto;display:flex;gap:8px;align-items:center}
-.connection:before{content:"";width:7px;height:7px;border-radius:50%;background:#a2b0b6;flex-shrink:0}.connection.connected:before{background:var(--green)}
+.connection:before{content:"";width:7px;height:7px;border-radius:50%;background:#a2b0b6;flex-shrink:0}.connection.connected:before{background:var(--green)}.connection.partial:before{background:var(--amber)}
 main{max-width:1580px;margin:auto;padding:38px 24px 44px}
 .page-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}
 .eyebrow{font-size:10px;letter-spacing:.14em;color:var(--accent);font-weight:750;margin:0 0 9px}
