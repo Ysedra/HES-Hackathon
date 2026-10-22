@@ -30,6 +30,16 @@ Missing evidence produces an uncertain result rather than a false verdict. The i
 
 The AI baseline uses `cross-encoder/nli-MiniLM2-L6-H768`. English is the initial language. The topic scope, source allowlist, and cache size still need to be agreed. The current baseline searches the open web; restricted retrieval is planned for a later comparison.
 
+## Development setup
+
+The project uses Python 3.12 and `uv` for dependency management. From the repository root, create or update the environment with:
+
+```bash
+uv sync
+```
+
+In VS Code, select `.venv/bin/python` as the notebook kernel. Project dependencies are declared in `pyproject.toml`; `uv.lock` records the resolved environment used by the team.
+
 ## Architecture
 
 ```mermaid
