@@ -35,6 +35,10 @@ def get_loopback():
     speaker = sc.default_speaker()
     return sc.get_microphone(id=speaker.name, include_loopback=True)
 
+# Open the default microphone of the computer (the sound in the room).
+def get_microphone():
+    return sc.default_microphone()
+
 
 # Take one chunk (0.5 s) from the recorder and make it mono.
 # After this, the chunk is ready to give to the ASR model.
