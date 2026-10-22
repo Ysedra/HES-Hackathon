@@ -1,0 +1,737 @@
+UNIDENTIFIED PERSON #1, BYLINE: This is PLANET MONEY from NPR.
+
+(SOUNDBITE OF SONG, "PLANET MONEY (IT'S THEIR 1,000TH EPISODE)")
+
+SCOTT LANE AND DEAU EYES: (Singing) PLANET MONEY - it's their 1,000th episode.
+
+KENNY MALONE, HOST:
+
+Yeah, it's our 1,000th episode. And to be honest, we spent a lot of time thinking about ways to avoid doing this episode.
+
+SARAH GONZALEZ, HOST:
+
+There's a lot going on right now. So at one point, we were like, what if we just skip episode 1,000, go from Episode 999 to Episode 1,001 and just do the big 1,000th later when we can throw a real party?
+
+MALONE: Or my personal suggestion - we could suddenly switch to decimal system. You know, like, suddenly it's 999.5, 999.75, 999.875. We don't ever have to get to a thousand.
+
+GONZALEZ: We can stay young forever.
+
+MALONE: But then we were like, all right, let's see what the listeners have to say. And this is when we asked you to send us your favorite moments from PLANET MONEY.
+
+GONZALEZ: And we listened to a bunch of your suggestions. And as we were going through them, we noticed we've taken you inside a lot of places. We've taken you inside the world of cheese cartels, the invention of money, libertarian summer camp, the birth of the spreadsheet. But we've never actually taken you inside our own show. So we're like, what if we do a PLANET MONEY about PLANET MONEY?
+
+MALONE: I mean, over a thousand episodes, we have developed a kind of formula for what makes a PLANET MONEY episode a PLANET MONEY episode. And we thought - you know what? - for the 1,000th episode, why don't we just share that formula with you today?
+
+GONZALEZ: For instance, this thing we just did here, told you a little story about not knowing what to do for the 1,000th episode, teased that there was a problem - this is almost always the kind of thing we do at the top of an episode. This is what we call this part, the top.
+
+MALONE: And another thing we like to do at the top is try to hook you in with, like, a great character or voice, like in Episode No. 925, when we started with the guy who got the United States to recycle, accidentally, with help from the mafia.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+LOWELL HARRELSON: Oh, yes. Now, that's a story that'll take a lot more time than we have today. Garbage in New York - that was like a controlled substance.
+
+GONZALEZ: What is he talking about? We're not going to tell you just yet.
+
+MALONE: No.
+
+GONZALEZ: That's the point. This is the part of the episode where that cliffhanger soundbite goes.
+
+MALONE: Robert Smith, give us the perfect cliffhanger soundbite for Episode 1,000. Go.
+
+ROBERT SMITH, BYLINE: I'm supposed to just make something up?
+
+MALONE: Yeah.
+
+SMITH: (Whispering) Cliffhanger soundbite? Listen. Listen, everybody. Listen. You know the best things we've done, but have you heard the worst things we've done, the things that we don't want you to hear ever again, the things we're afraid to tell you? (Whispering) It's all in this show.
+
+MALONE: And this is where the off-brand music starts.
+
+(SOUNDBITE OF EMANUEL KALLINS AND STEPHEN TELLER'S "SMOOTHIE")
+
+GONZALEZ: You know what comes here.
+
+MALONE: Go ahead.
+
+GONZALEZ: Yeah, do it.
+
+UNIDENTIFIED PERSON #2: Oh, really?
+
+MALONE: You know it.
+
+UNIDENTIFIED PERSON #2: Hello, and welcome to PLANET MONEY.
+
+UNIDENTIFIED PERSON #3: Welcome to PLANET MONEY.
+
+UNIDENTIFIED PERSON #4: Hello, and welcome to PLANET MONEY.
+
+UNIDENTIFIED PERSON #5: Hello.
+
+UNIDENTIFIED PEOPLE: (Speaking Spanish).
+
+GONZALEZ: Very nice.
+
+(SOUNDBITE OF EMANUEL KALLINS AND STEPHEN TELLER'S "SMOOTHIE")
+
+MALONE: Hello, and welcome to PLANET MONEY. By the way, that is what we call this whole music-y section here, the hello and welcome. I'm Kenny Malone.
+
+GONZALEZ: I'm Sarah Gonzalez. We now have 1,000 episodes under our belt.
+
+MALONE: We've produced almost 400 hours of content.
+
+GONZALEZ: From more than 40 countries, by, like, 20 different hosts.
+
+MALONE: We have our own spinoff podcast, The Indicator.
+
+GONZALEZ: We've speculated in gold, shorted America, made our own vodka, shot a low-budget horror film, created a shell company.
+
+MALONE: And now it is time for us to bring you inside PLANET MONEY, to show you the tricks we keep doing and hope that you don't notice and also the tricks we've done so many times, we've had to ban them completely.
+
+GONZALEZ: And as far as hello and welcome sales pitches go, this one is pretty reasonable. We've gotten a little out of control over the years.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+ALEX BLUMBERG, BYLINE: Today on the show, the one-page dream plan to solve global warming for free.
+
+SMITH: Today on the podcast, how an entire country can get out of debt.
+
+KAREN DUFFIN: ...Set in motion one of the biggest political shifts in generations.
+
+DAVID KESTENBAUM: I don't think I'm exaggerating here. This one little story, it explains why we are where we are today, why billions of people don't have to worry about starving today.
+
+MALONE: Today on the show, a show about the show.
+
+(SOUNDBITE OF SONG, "PLANET MONEY (IT'S THEIR 1,000TH EPISODE)")
+
+LANE AND DEAU EYES: (Singing) PLANET MONEY - it's their 1,000th episode.
+
+GONZALEZ: This is giving me, like, Mr. Winslow, "Sister Sister," Topanga vibes.
+
+MALONE: I want to be, like, in the "Full House" with Uncle Jesse.
+
+GONZALEZ: I mean, you always want to be with Uncle Jesse.
+
+MALONE: All right. This part of the episode after the break, this is what we call the shoulders.
+
+GONZALEZ: Yeah, because if the top is the top, then this part is obviously the shoulders, right? Head, top, shoulders.
+
+MALONE: Sure. A lot of times, the shoulder is also where we dump caveats, like technically, this is our 1,000th numbered episode, but there were a whole bunch of episodes, like, way back in the beginning, 12 years ago, that nobody ever numbered. So there are more than a thousand PLANET MONEY episodes.
+
+GONZALEZ: We also apparently have two Episode 256s. Whoops.
+
+MALONE: Yeah, what are you going to do? But now that we've said all of this exactly once in the shoulders, we can just keep referring to this as the thousandth episode for the rest of the episode.
+
+GONZALEZ: OK, so now that the caveats are out of the way, we got to get back into the story. We've made all these big promises in the top and in the hello and welcome. You are ready to hear the story. We want to tell it to you. But, oh, no, we're not going to tell it to you yet. We're going to take a big step back, pull this little move.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+AILSA CHANG: OK, so in order to understand the first government shutdown ever, we really need to take you back to the Civil War.
+
+BLUMBERG: Today, we are going back in time to the 12th and 13th century.
+
+NOEL KING: All the way back to ancient Rome.
+
+SMITH: Back to the ancient Greeks, the ancient Romans.
+
+MARY CHILDS: Three hundred years ago with the pirate Blackbeard.
+
+GONZALEZ: This is us giving you context. This is the learning part, a little bit of vegetables. You want to understand the world today, you got to understand the past, how we got here.
+
+MALONE: And there is one moment in particular we apparently really want you to understand well.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+GREG ROSALSKY: And then came the Great Depression.
+
+CAITLIN KENNEY: The Great Depression.
+
+KESTENBAUM: The Great Depression.
+
+SALLY HELM: The Great Depression.
+
+ADAM DAVIDSON: The Great Depression.
+
+ZOE CHACE: The Great Depression.
+
+GONZALEZ: The Great Depression. We asked our two longest serving hosts, Robert Smith and Jacob Goldstein, about this peculiar habit.
+
+MALONE: Are you guys recording?
+
+JACOB GOLDSTEIN, BYLINE: Yes.
+
+SMITH: Yes.
+
+MALONE: OK. So it's my understanding that we used to flashback so often to the Great Depression the two of you used to talk about having a song made for it.
+
+GOLDSTEIN: (Singing) The Great Depression.
+
+SMITH: (Singing) It's the Great Depression.
+
+MALONE: (Laughter).
+
+SMITH: Yeah.
+
+MALONE: Yeah. Well, we have actually commissioned one, and here you go.
+
+GOLDSTEIN: Yes.
+
+JOHN PINAMONTI: (Strumming guitar, singing) We're going back to the Great Depression.
+
+SMITH: That's great.
+
+GOLDSTEIN: Well, yeah. A little kind of Woody Guthrie vibe. Here. Should we try it? Let's try. Let's try it once for real.
+
+SMITH: Yeah. It's just like, in order to understand what's happening now and, really, the severity of what's happening now, you really need to go back in time.
+
+PINAMONTI: (Strumming guitar, singing) We're going back to the Great Depression.
+
+GOLDSTEIN: Love it. But to really understand what...
+
+PINAMONTI: (Singing) Back to the Great Depression.
+
+MALONE: But to really understand how PLANET MONEY found its formula...
+
+GONZALEZ: Yeah, you really need to go back in time to the Great Recession, 2008, to "The Giant Pool Of Money."
+
+MALONE: This is what a lot of people think of as our first episode, but technically, it is a This American Life episode.
+
+GONZALEZ: "The Giant Pool Of Money" took what This American Life is good at - find a great character, tell a story - and used it to do something different, to explain something complex, abstract, seemingly too far away to understand, like a super-collateralized mortgage crisis fueled by international money flows.
+
+MALONE: There's this one interview from that story in particular that feels like it's a kind of Big Bang moment for PLANET MONEY. Alex Blumberg and Adam Davidson, our show's founders, they found this guy named Clarence for "The Giant Pool Of Money." And what was amazing about Clarence was that he seemed to know that he was both a victim of the housing crisis and also arguably a participant in the mess. He'd taken out a pretty big mortgage.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+CLARENCE NATHAN: Call it 540 for round figures.
+
+BLUMBERG: You basically borrowed $540,000 from the bank, and they didn't check your income.
+
+NATHAN: It's a no income verification loan. They don't call me up and say, you know, how much money? They don't do that. I mean, it's almost like you pass a guy in the street and say, will you lend me $540,000? He says, well, what do you do? Hey, I got a job. OK.
+
+(SOUNDBITE OF MUSIC)
+
+BLUMBERG: Would you have loaned you the money?
+
+NATHAN: I wouldn't have loaned me the money. And nobody that I know would have loaned me the money. I mean, I know guys who are criminals that wouldn't lend me that money, and they'd break your kneecaps, so (laughter), yeah, I don't know why the bank did it.
+
+GONZALEZ: Last week, we called up Alex Blumberg to ask about this Clarence moment.
+
+BLUMBERG: That question of sort of, would you have lent you the money, I think in some ways is a blueprint for a certain kind of ethos of PLANET MONEY, which is, like, to know the big structural context but also to be talking to the people in the middle who are most affected by that context and getting their honest, authentic, nonjudgmental reactions, thoughts, observances of what it's like to be at the center of these large forces.
+
+MALONE: The secret to a great PLANET MONEY episode is to find that Clarence, that amazing person who happens to be at the center of everything.
+
+GONZALEZ: And sometimes, we find the person who, you know, accidentally emergency landed in Iran...
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+DARIO SANGUIGNI: So everyone was like, what? We're going to Iran? Are we allowed to do that?
+
+GONZALEZ: ...Or that doctor who intentionally paralyzed himself for his startup.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+MATT LEWIN: And Phil said, well, we could paralyze you and then see if the nasal spray works.
+
+GONZALEZ: And then there's just, like, some guy trying to catch a cow thief. That's who Zoe Chace and Stacey Vanek Smith found.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+STACEY VANEK SMITH: So we met up with Special Agent Jerry Flowers in the parking lot of the Oklahoma Department of Agriculture. And he was there with his team, and they're all dressed alike.
+
+CHACE: And they look just ready for action.
+
+JERRY FLOWERS: Starched jeans, starched shirts and wore-out boots, and a clean white hat. Good guys wear white hats.
+
+VANEK SMITH: Is that true?
+
+FLOWERS: Oh, it is out here.
+
+GONZALEZ: We call this walk-on tape. It's the way the character walks into the story, into our lives. We spend a lot of time thinking about how to introduce people to you.
+
+MALONE: Cowboy introductions, apparently, are relatively easy. Economists, on the other hand, you may have to work a little harder for the walk on.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+KESTENBAUM: Like this guy.
+
+ROBERT SHILLER: I'm Robert Shiller, professor of economics at Yale University.
+
+KESTENBAUM: Can you add that you're a Nobel Prize winner and that you predicted the Great Recession?
+
+SHILLER: You want me to say that? You're supposed to say that.
+
+KESTENBAUM: I just did.
+
+MALONE: OK, so you found your Clarence. You've done your walk on. We are now at the body of the story, the part after the shoulders. Body's under the shoulders - make sense? But now we have to do some actual work at some point. We have to explain some big economic concept.
+
+GONZALEZ: This is where we earn our paychecks. This is where we have to get creative to explain things like dramatic shifts in year-over-year parcel-specific housing prices.
+
+MALONE: Yeah, real example, which I know doesn't sound enticing, but back in 2011, the Case-Shiller Home Price Index was going bananas, and it was fascinating.
+
+GONZALEZ: There was this incredible graph. I have it right here. It shows the booming and then collapsing home prices.
+
+(SOUNDBITE OF PAPER RUSTLING)
+
+GONZALEZ: Oh, oh, you can't see this graph on the radio? Oh, problem.
+
+MALONE: Yeah, but you can take numbers on a graph, turn them into musical notes and then bring in an opera singer to sing the graph.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+TIMOTHY MCDEVITT: (Vocalizing).
+
+GOLDSTEIN: So that's the national number. And you can definitely, you know, hear the boom and bust. But, like, we wanted to go big, right? So we got him to sing Miami, the city with the biggest housing boom in America.
+
+MCDEVITT: (Vocalizing).
+
+KESTENBAUM: You're kind of rooting for it on the way up, and then you're like, no, no, no.
+
+(LAUGHTER)
+
+GOLDSTEIN: That's how it was to live in Miami.
+
+GONZALEZ: OK. Now, some economic concepts are so big, are so global that not even a room full of graph-singing baritones could really bring you along, like supply chains or financial markets or the entire oil industry.
+
+MALONE: Yeah. Like, what do you even think of when we say oil industry? So sometimes, we've learned it's better to just throw ourselves into the middle of the industry - in the case of one series, to buy, transport and process 100 barrels of oil ourselves.
+
+GONZALEZ: This way, we can bring you in the room when an oil deal goes down. We can tell you what it looks like, smells like, feels like.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+VANEK SMITH: Oh, my gosh. It's - it is the color of coffee.
+
+JASON BRUNS: Yeah, looks like a good latte (laughter).
+
+VANEK SMITH: Can we touch it? Is that cool?
+
+BRUNS: Yeah, you can.
+
+VANEK SMITH: Oh, it's cool. Oh, that feels really weird. This is our oil, right?
+
+BRUNS: Right now, it's my oil. But...
+
+VANEK SMITH: I thought this was, like...
+
+BRUNS: ...It's going to be your oil (laughter).
+
+VANEK SMITH: I thought, like, this was, like, handshake country.
+
+BRUNS: Oh, yeah, it is. But we haven't shaken hands yet.
+
+GONZALEZ: And then when we wanted to explain the commercialization of outer space, we shot a satellite into space.
+
+MALONE: With our logo on it.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+UNIDENTIFIED PERSON #6: T minus 30 seconds.
+
+VANEK SMITH: (Whispering) He said T minus.
+
+SMITH: (Whispering) I don't know why everyone's whispering.
+
+UNIDENTIFIED PERSON #6: Five, four, three, two, one. We have ignition.
+
+SMITH: (Whispering) I don't hear anything.
+
+UNIDENTIFIED PERSON #7: Vehicle has cleared the tower. Umbies (ph) are disconnected.
+
+VANEK SMITH: Whoa.
+
+SMITH: Whoa, whoa, whoa. It's so bright.
+
+VANEK SMITH: Oh, my gosh. Whoa.
+
+SMITH: Oh, it's shooting up so fast. Oh, you can barely stare at it.
+
+VANEK SMITH: There's a flame behind it. Whoa.
+
+SMITH: Oh, my God.
+
+VANEK SMITH: Whoa. It's hard to look at it.
+
+UNIDENTIFIED PERSON #7: Altitude remains nominal of the Castor 120 stage zero motor...
+
+MALONE: But by far the project people ask us about the most is when we set out to explain global trade by making our own PLANET MONEY T-shirt - the one with the squirrel holding a martini glass, an animal drinking spirits - animal spirits - John Maynard Keynes gag.
+
+GONZALEZ: For the T-shirt project, we followed a bale of cotton from Mississippi to Indonesia, where it was spun, and then to Bangladesh, where it was sewn.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+CHACE: Ashu (ph), can I put on a T-shirt? That's the finished shirt, right?
+
+GONZALEZ: Listeners bought thousands and thousands of our T-shirts. And the point of the project was that every time you put the T-shirt on, you'd think of all the people around the world who touched it - the farmer, the weaver and the two sisters in Bangladesh who sewed the collar, Shumi and Minu. We wanted you to think about what was going on in their lives when they made the shirt.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+KENNEY: Shumi sends some money back to her parents, but she also has her own bank account. And she's saving for something special, something that shows what a different world she's living in compared to the one her sister grew up in.
+
+SHUMI: (Non-English language spoken). I just save the money if I need it for my marriage. And then I use the money for my marriage.
+
+KENNEY: For your marriage.
+
+SHUMI: Yes.
+
+KENNEY: So I've got to ask. Do you have a groom in mind?
+
+SHUMI: (Laughter).
+
+KENNEY: Yes?
+
+SHUMI: Yes.
+
+KENNEY: What's his name?
+
+Shumi is blushing and laughing, and she won't tell me his name. They work together.
+
+Why don't you want to tell me? Is it secret? Is it a secret romance?
+
+SHUMI: Yeah, it's secret.
+
+KENNEY: Oh, forbidden romance. Very intriguing. Did you talk to him tonight?
+
+(LAUGHTER)
+
+MALONE: After the break, forbidden PLANET MONEY - contraband PLANET MONEY tropes.
+
+GONZALEZ: One of the dangers of doing 1,000 episodes is that they can kind of start to sound the same.
+
+MALONE: Yeah. Let's say hypothetically you're Robert Smith. You're in a big library. What is the easiest way to show you, the listener, how big that library is?
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+SMITH: (Shouting) You have books.
+
+GONZALEZ: Or let's say Kenny Malone has discovered a secret underground government cheese cave. How might he place you in said cheese cave?
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+MALONE: (Shouting) Government cheese.
+
+That's pretty good. You don't do that, huh?
+
+DAN CALLAHAN: No, I never thought about it.
+
+MALONE: Yeah, probably gets old.
+
+Do we yell too much? Probably.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+SMITH: Corporate...
+
+GOLDSTEIN: Corporate...
+
+SMITH: ...Income...
+
+GOLDSTEIN: ...Income...
+
+SMITH: (Shouting) ...Tax.
+
+GOLDSTEIN: ...Tax.
+
+SMITH: Corporate income tax.
+
+MALONE: Also this.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+GOLDSTEIN: (Whispering) Currency exchange rate.
+
+SMITH: (Whispering) Trade deal confidential.
+
+KING: (Whispering) Where the hell is my calculator?
+
+ALEXI HOROWITZ-GHAZI: (Whispering) The snozzberries taste like snozzberries.
+
+GOLDSTEIN: (Whispering) Land of fire.
+
+GONZALEZ: All right, but we yell and we whisper because we're trying to engage your senses - yeah, sound, but radio is a medium that needs all your senses - all your senses.
+
+MALONE: Consider Episode 657 - "The Onion King."
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+KEITH ROMER: If you're on the farm, you can pull one right out of the ground and take a bite.
+
+I'm just - I'm going for it.
+
+RICK MINKUS: No, you ain't going to do that. It's too hot.
+
+ROMER: I mean, it's very onion-y. Whew. Whew.
+
+MINKUS: Now it's hot.
+
+ROMER: Man.
+
+MINKUS: Now it's hot, huh?
+
+ROMER: That's what a fresh onion tastes like, huh?
+
+SMITH: For the record, we made Keith do that. It's kind of a PLANET MONEY hazing.
+
+ROMER: Oh, thanks. Thanks for that.
+
+GONZALEZ: It is kind of like a rite of passage here. Kenny tasted oil - like, crude oil.
+
+MALONE: So bad.
+
+GONZALEZ: Robert ate a raw Kalamata olive in Kalamata, Greece. Karen Duffin had to drink raw milk kind of against her will. Sorry, Karen. I ate, like - I don't know - a pound of French fries for a story.
+
+MALONE: Sarah clearly got the best assignment out of all of us.
+
+GONZALEZ: (Laughter) Yeah.
+
+MALONE: But here is something that we do talk about a lot, like what radio things are now just part of the PLANET MONEY brand and what things have we done so many times that we should probably stop doing them. Many of those things actually weirdly involve paper on the radio.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+DAN PASHMAN: Here it is, Alex. That's an authentic paper sound effect, which means I'm about to read a law to you.
+
+JOE SPRARAGEN: Here we have the entire Harmonized Tariff Schedule of the United States - dropped on the floor.
+
+(SOUNDBITE OF THUD)
+
+GONZALEZ: There is actually an active debate about whether we should ban rustling paper and dropping books.
+
+MALONE: I am pro-paper rustling. I will die on that hill.
+
+GONZALEZ: I mean, I just did it today.
+
+MALONE: That's a fair point.
+
+GONZALEZ: But there are things that we have actually officially banned. There are words that we're not allowed to say anymore. For example, there's this one phrase that is just so perfect, like, anytime you want to tell someone, this is the bottom line, this is the main takeaway, this is the thing.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+CHACE: Here's the thing. We take for granted that the developing world is going to buy our stuff because they like our style.
+
+BLUMBERG: And here's the thing. A hedge can sometimes be used for protection.
+
+JASMINE GARSD: But here's the thing. Chile is a democracy.
+
+PADDY HIRSCH: OK, but here's the thing. Demand was high.
+
+KING: Yes. And, Nick, here's the thing. That is before Hurricane Harvey.
+
+GONZALEZ: When I started here two years ago, I was told that we have done here's the thing so many times that I only get to use it one time over the course of my entire PLANET MONEY career. Also, the phrase, it turns out - you only get one it turns out, so I am just waiting for, like, that special moment where I absolutely have to say, here's the thing.
+
+MALONE: Also, I was told that we have apparently overused magic (imitates poof) disappeared. And so last episode, I had to say magic kazaam (ph), which is not a thing.
+
+GONZALEZ: Like (imitates poof) gone.
+
+MALONE: Yes, yes, yes.
+
+GONZALEZ: (Imitates poof) Magic - magic.
+
+MALONE: We're going to have to bleep all this. Stop doing that.
+
+Now, in a real episode, this is around the time where the show would start to wrap up, usually with some bigger reflection on what it all means, and try to make it feel like the show has come full circle somehow.
+
+GONZALEZ: And one of the things we will often do at the end of a show is go back to the first person you heard from for some closing thoughts. And you heard from a lot of people in this episode, but if we're really going to do this ender move here, the very first person you heard from in the top was this guy.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCAST)
+
+HARRELSON: Oh, yes. Now, that's a story that'll take a lot more time than we have today.
+
+MALONE: That is Lowell Harrelson.
+
+(SOUNDBITE OF PHONE RINGING)
+
+MALONE: And we called him back.
+
+HARRELSON: Hello?
+
+GONZALEZ: Hey. Is this Lowell?
+
+HARRELSON: Yes, ma'am.
+
+GONZALEZ: Hey, Lowell. This is Sarah. Do you remember me?
+
+HARRELSON: Sure, Ms. Sarah, I remember you. You the nice lady that came all the way to Mobile, aren't you?
+
+GONZALEZ: Yes, I am (laughter).
+
+HARRELSON: How have you been doing?
+
+GONZALEZ: How are you doing?
+
+HARRELSON: Well, I'm hanging in there.
+
+GONZALEZ: So we just wanted to check in with you to see how you're doing during all of this.
+
+HARRELSON: Oh, that's another story entirely, I tell you. You know, being quarantined has been a real experience for me. It's not easy. So I feel really isolated and lonely, to be honest with you about it. But I can turn around and feel the pain of others and hear the stories and talk on the phone with friends of mine. And suddenly, I feel a togetherness unlike anything else before in my life. You know what I mean?
+
+MALONE: Yeah, we know exactly what he means. Here is the thing. This show was born during the Great Recession, when we were all part of this same big story. And we certainly would have never guessed that our 1,000th episode would fall right in the middle of the next huge, even bigger moment when we are all in something together. But here we are.
+
+GONZALEZ: Here we are. And we're going to keep bringing you stories. We're going to keep going places, going back in time in order to understand. We're going to keep explaining, keep bringing you voices.
+
+Oh, well, Lowell, I hope that you're...
+
+HARRELSON: Thank you.
+
+GONZALEZ: ...Staying safe...
+
+HARRELSON: Thank you.
+
+GONZALEZ: ...And healthy and away from as many people as possible.
+
+HARRELSON: (Laughter) That's right.
+
+GONZALEZ: OK, Lowell, you take care.
+
+HARRELSON: Thank you, ma'am.
+
+GONZALEZ: OK.
+
+HARRELSON: You, too. I hope we get to cross paths again someday.
+
+MALONE: Maybe someday we will be able to have a big party. We'll invite Lowell. All of you can come - in real life, not virtually. But for now, we'll keep making the show. If it's OK, we are going to stop counting episodes now.
+
+(SOUNDBITE OF DC JANSSON SONG, "WASTED HOURS")
+
+MALONE: We want to thank you, listener, so, so much for being there with us. We have a playlist of some of our favorite episodes that is on our website right now. You can find it at npr.org/money.
+
+GONZALEZ: And we love to hear from you, so email us at planetmoney@npr.org. We're also on Instagram, Twitter, Facebook - @planetmoney.
+
+MALONE: And, yeah, we're a thousand episodes old. Like, whatever. That's like 10,000 years in podcast years. But guess who's on TikTok now, suckers...
+
+GONZALEZ: (Laughter).
+
+MALONE: ...@planetmoney.
+
+GONZALEZ: Find us.
+
+MALONE: That's right. Old dog, new tricks.
+
+GONZALEZ: TikTok at us.
+
+MALONE: Yeah, TikTok at us.
+
+(LAUGHTER)
+
+GONZALEZ: Should we do a dance, Kenny? Should we, like, do a TikTok dance?
+
+MALONE: Yes.
+
+GONZALEZ: Yes.
+
+MALONE: Special thanks this week to Scott Lane of American Paradox Records for the 1,000th episode theme song and also to Keith Romer and John Pinamonti for the Great Depression song.
+
+GONZALEZ: I'm Sarah Gonzalez.
+
+(SOUNDBITE OF ARCHIVED NPR BROADCASTS)
+
+DAVIDSON: I'm Adam Davidson.
+
+BLUMBERG: I'm Alex Blumberg.
+
+CHANA JOFFE-WALT: I'm Chana Joffe-Walt.
+
+KESTENBAUM: And I'm David Kestenbaum.
+
+LAURA CONAWAY: I'm Laura Conaway.
+
+GOLDSTEIN: I'm Jacob Goldstein.
+
+KENNEY: I'm Caitlin Kenney.
+
+SMITH: And I'm Robert Smith.
+
+CHACE: I'm Zoe Chace.
+
+STEVE HENN: I'm Steve Henn.
+
+JESS JIANG: And I'm Jess Jiang.
+
+QUOCTRUNG BUI: I'm Quoctrung Bui.
+
+LISA CHOW: I'm Lisa Chow.
+
+VANEK SMITH: I'm Stacey Vanek Smith.
+
+GREGORY WARNER: I'm Gregory Warner.
+
+SONARI GLINTON: I'm Sonari Glinton.
+
+ASHLEY MILNE-TYTE: I'm Ashley Milne-Tyte.
+
+ALEX GOLDMARK: I'm Alex Goldmark.
+
+MARIANNE MCCUNE: And Marianne McCune.
+
+BRYANT URSTADT: And I'm Bryant Urstadt.
+
+GARSD: I'm Jasmine Garsd.
+
+TAYLOR TEPPER: I'm Taylor Tepper.
+
+JULIA DEWITT: I'm Julia DeWitt.
+
+JULIA SIMON: And I'm Julia Simon.
+
+AUDREY QUINN: I'm Audrey Quinn.
+
+NICK FOUNTAIN: I'm Nick Fountain.
+
+CHRIS ARNOLD: And I'm Chris Arnold.
+
+DAN CHARLES: I'm Dan Charles.
+
+DINA TEMPLE-RASTON: I'm Dina Temple-Raston.
+
+SINDHU GNANASAMBANDAN: I'm Sindhu Gnanasambandan.
+
+EDUARD SAAKASHVILI: And I'm Eduard Saakashvili.
+
+ELIZABETH KULAS: I'm Elizabeth Kulas.
+
+HELM: And I'm Sally Helm.
+
+CHANG: And I'm Ailsa Chang.
+
+KING: And I'm Noel King.
+
+ROMER: And I'm Keith Romer.
+
+CARDIFF GARCIA: I'm Cardiff Garcia.
+
+HIRSCH: I'm Paddy Hirsch.
+
+DARIUS RAFIEYAN: And I'm Darius Rafieyan.
+
+CONSTANZA GALLARDO: I'm Constanza Gallardo.
+
+LEENA SANZGIRI: I'm Leena Sanzgiri.
+
+DARIAN WOODS: I'm Darian Woods.
+
+CORY TURNER: And I'm Cory Turner.
+
+ROSALSKY: I'm Greg Rosalsky.
+
+HOROWITZ-GHAZI: I'm Alexi Horowitz-Ghazi.
+
+JULIA FURLAN: And I'm Julia Furlan.
+
+DANIELLE KURTZLEBEN: I'm Danielle Kurtzleben.
+
+TOM GOLDMAN: I'm Tom Goldman.
+
+CHILDS: I'm Mary Childs.
+
+AMANDA ARONCZYK: I'm Amanda Aronczyk.
+
+TRACEY SAMUELSON: I'm Tracey Samuelson.
+
+JAMES SNEED: I'm James Sneed.
+
+LIZA YEAGER: I'm Liza Yeager.
+
+JASON BEAUBIEN: I'm Jason Beaubien.
+
+DUFFIN: I'm Karen Duffin.
+
+MALONE: And I'm Kenny Malone. This is NPR. Thanks to everybody who helped us make 1,000 episodes. And thanks to all of you for listening.
+
+(SOUNDBITE OF SONG, "PLANET MONEY (IT'S THEIR 1,000TH EPISODE)")
+
+LANE AND DEAU EYES: (Singing) PLANET MONEY - we're not going to count episodes anymore.
