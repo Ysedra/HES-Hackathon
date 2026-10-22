@@ -21,6 +21,8 @@ https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-i
 
 """
 
+import sys
+
 import numpy as np
 import soundcard as sc
 
@@ -49,12 +51,18 @@ def read_chunk(recorder):
 
 
 # Only for testing: record until Ctrl+C and print the level of every chunk.
+# Loopback:   uv run python audio_capture.py
+# Microphone: uv run python audio_capture.py microphone
 if __name__ == "__main__":
-    loopback = get_loopback()
-    print("Recording from:", loopback)
+    if len(sys.argv) > 1 and sys.argv[1] == "microphone":
+        source = get_microphone()
+    else:
+        source = get_loopback()
+
+    print("Recording from:", source)
     print("Press Ctrl+C to stop.")
 
-    with loopback.recorder(samplerate=SAMPLERATE) as recorder:
+    with source.recorder(samplerate=SAMPLERATE) as recorder:
         try:
             while True:
                 chunk = read_chunk(recorder)
