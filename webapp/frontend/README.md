@@ -12,7 +12,7 @@ uv run fastapi dev webapp/backend/main.py
 
 Open <http://localhost:8000/>. Use **Try interface demo** to see a compound snippet become two individually selectable claims. All demo verdicts, source excerpts and model scores are labelled illustrative. No demo timings enter the experiment log.
 
-A plain static server (e.g. `python -m http.server`) still shows the interface and the demo, but cannot handle `POST /api/analyse`. Missing endpoints produce an explicit error, never synthetic verdicts. The media player is a local preview, not live transcription.
+A plain static server (e.g. `python -m http.server`) still shows the interface and the demo, but cannot handle the `POST /api/analyse/...` routes. Missing endpoints produce an explicit error, never synthetic verdicts. The media player is a local preview, not live transcription.
 
 The connection status in the top bar polls `GET /api/health` every 5 seconds, on window focus, and after a failed run. The backend answers `{"status": "ok", "versions": [...]}` once its models are loaded; the status is green when the selected version is listed, amber when it is not, and grey when the backend does not answer.
 
@@ -42,7 +42,9 @@ Use localhost or HTTPS for microphone permission. No real microphone recording o
 
 ## Local HTTP adapter
 
-`POST /api/analyse` is implemented in `webapp/backend/main.py`, with the shapes below in `webapp/backend/schemas.py`. It currently supports `baseline` (v0) only. A text request is JSON:
+There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (v0) only. Both are documented, and can be tried, at <http://localhost:8000/docs>.
+
+`POST /api/analyse/text` takes JSON:
 
 ```json
 {
@@ -58,13 +60,13 @@ Use localhost or HTTPS for microphone permission. No real microphone recording o
 }
 ```
 
-Audio/video requests are `multipart/form-data` with:
-- `media`: the complete file/recording;
+`POST /api/analyse/media` takes audio/video (uploaded files and microphone recordings) as `multipart/form-data` with:
+- `media`: the complete file/recording (up to 100 MB);
 - `metadata`: a JSON string containing the same `run_id`, `version_id`, and `config`.
 
 Validate the version against a backend-owned configuration. Return HTTP errors for invalid requests and unavailable versions, before streaming starts.
 
-The response is streamed as NDJSON (`Content-Type: application/x-ndjson`): one event per line, in the same envelope as the asynchronous events below, sent as soon as each step finishes. The dashboard updates with every line, so segments and claims appear while the rest of the input is still being processed:
+Both routes stream the same response as NDJSON (`Content-Type: application/x-ndjson`): one event per line, in the same envelope as the asynchronous events below, sent as soon as each step finishes. The dashboard updates with every line, so segments and claims appear while the rest of the input is still being processed:
 
 ```
 {"run_id": "<same UUID>", "version_id": "baseline", "type": "transcript.segment", "data": {"id": "segment-42", "start_ms": 0, "end_ms": 4000, "text": "Paris is in France and Berlin is in Germany.", "is_stable": true, "extraction_complete": true}}

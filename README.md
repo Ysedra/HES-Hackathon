@@ -74,7 +74,8 @@ The backend runs the `pipeline_v0.ipynb` pipeline as the `baseline` version; oth
 
 | File | Role |
 | --- | --- |
-| `main.py` | Routes only: `GET /api/health`, `POST /api/analyse`, and the frontend's static files |
+| `main.py` | Routes only: `GET /api/health`, `POST /api/analyse/text`, `POST /api/analyse/media`, and the frontend's static files. Try them at [http://localhost:8000/docs](http://localhost:8000/docs) |
+| `api_helpers.py` | HTTP helpers for the routes: version check (HTTP 422) and the streamed NDJSON response |
 | `schemas.py` | Request and response shapes, matching the frontend contract |
 | `versions.py` | The versions the backend implements, and which steps each enables |
 | `pipeline.py` | Runs the services in order for one request; loads the models once at startup |

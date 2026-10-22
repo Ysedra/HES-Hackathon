@@ -254,19 +254,21 @@ async function analyse(input) {
   setRunNotice(run, input.text ? "Sending text for claim extraction and verification…" : "Sending audio/video to local transcription and verification…");
   render();
   try {
-    let body, headers = {};
+    let url, body, headers = {};
     const metadata = { run_id: run.id, version_id: run.version_id, config: run.config };
     if (input.text) {
+      url = "/api/analyse/text";
       body = JSON.stringify({ ...metadata, text: input.text });
       headers["Content-Type"] = "application/json";
     } else {
+      url = "/api/analyse/media";
       body = new FormData();
       body.append("media", input.media, input.filename || "microphone.webm");
       body.append("metadata", JSON.stringify(metadata));
     }
-    const response = await fetch("/api/analyse", { method: "POST", headers, body, signal: controller.signal });
+    const response = await fetch(url, { method: "POST", headers, body, signal: controller.signal });
     if (!response.ok) {
-      if ([404, 405, 501].includes(response.status)) throw new Error("The local /api/analyse backend is not connected yet. Input capture works, but live transcription and verdicts need the Python adapter. Your recording is available to save or retry.");
+      if ([404, 405, 501].includes(response.status)) throw new Error(`The local ${url} backend is not connected yet. Input capture works, but live transcription and verdicts need the Python adapter. Your recording is available to save or retry.`);
       throw new Error(`Backend returned HTTP ${response.status}. No verdicts were fabricated.`);
     }
     if (!response.headers.get("content-type")?.includes("application/x-ndjson")) throw new Error("Expected a streamed pipeline response, not a static page.");

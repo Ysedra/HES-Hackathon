@@ -1,6 +1,13 @@
 """
-Backend: serves the frontend and POST /api/analyse on the same origin.
-Routes only: the work happens in pipeline.py.
+Backend: serves the frontend and the API on the same origin.
+App setup and routes only: HTTP helpers are in api_helpers.py, the work happens in pipeline.py.
+
+- GET  /api/health          ready check and implemented versions
+- POST /api/analyse/text    typed text (JSON)
+- POST /api/analyse/media   an uploaded file or microphone recording (multipart form)
+
+Both analyse routes stream the run as NDJSON events (see pipeline.py).
+Try them at http://localhost:8000/docs
 
 Run from the repository root:  uv run fastapi dev webapp/backend/main.py
 Then open http://localhost:8000/
@@ -8,20 +15,17 @@ Then open http://localhost:8000/
 
 import logging
 from contextlib import asynccontextmanager
-
-import anyio
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from starlette.datastructures import UploadFile   # what request.form() returns
 
+from api_helpers import require_version, stream
 from pipeline import Pipeline
-from schemas import AnalyseRequest, Event
-from versions import VERSIONS, get_version
+from schemas import RunMetadata, TextRequest
+from versions import VERSIONS
 
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -56,64 +60,29 @@ async def health():
     return {"status": "ok", "versions": list(VERSIONS)}
 
 
-@app.post("/api/analyse")
-async def analyse(request: Request):
-    """Validate the request, then stream the run as NDJSON events (see pipeline.py)."""
+@app.post("/api/analyse/text")
+async def analyse_text(body: TextRequest, request: Request):
+    """Check typed text: it is split into sentences and each checkable one is verified."""
+    version = require_version(body.version_id)
+    log.info("run %s (%s): text, %d characters", body.run_id, version.id, len(body.text))
+    return stream(request, body, version, state["pipeline"].run_text(version, body.run_id, body.text))
+
+
+@app.post("/api/analyse/media")
+async def analyse_media(media: UploadFile, metadata: Annotated[str, Form()], request: Request):
+    """Transcribe and check a complete file or recording (WebM/Opus, MP4, Ogg, mp3...).
+    metadata is a JSON string with run_id, version_id and config."""
     try:
-        if request.headers.get("content-type", "").startswith("multipart/"):
-            form = await request.form(max_part_size=MAX_UPLOAD_BYTES)
-            media, metadata = form.get("media"), form.get("metadata")
-            if not isinstance(media, UploadFile) or not isinstance(metadata, str):
-                raise HTTPException(400, "Expected a 'media' file and a 'metadata' JSON field")
-            body = AnalyseRequest.model_validate_json(metadata)
-        else:
-            body = AnalyseRequest.model_validate_json(await request.body())
-            media = None
+        body = RunMetadata.model_validate_json(metadata)
     except ValidationError as error:
-        log.warning("rejected request: %s", error.errors(include_url=False))
         raise HTTPException(422, error.errors(include_url=False))
-
-    version = get_version(body.version_id)
-    if version is None:
-        log.warning("rejected request: version %r is not implemented", body.version_id)
-        raise HTTPException(422, f"Version {body.version_id!r} is not implemented yet")
-
-    pipeline = state["pipeline"]
-    if media is not None:
-        log.info("run %s (%s): media %r, %s, %d bytes", body.run_id, version.id,
-                 media.filename, media.content_type, media.size or 0)
-        events = pipeline.run_media(version, body.run_id, media.file, media.filename or "recording")
-    elif body.text and body.text.strip():
-        log.info("run %s (%s): text, %d characters", body.run_id, version.id, len(body.text))
-        events = pipeline.run_text(version, body.run_id, body.text)
-    else:
-        log.warning("rejected request: no text and no media")
-        raise HTTPException(422, "Send either text or a media file")
-
-    def line(type_, data):
-        return Event(run_id=body.run_id, version_id=version.id, type=type_, data=data).model_dump_json() + "\n"
-
-    def next_event() -> tuple[str, dict] | None:
-        return next(events, None)   # None when the run is over
-
-    async def stream():
-        """One JSON event per line, sent as soon as the pipeline yields it. Each step runs in a
-        worker thread, so Whisper, web search and NLI don't block the server. If the browser
-        goes away (new run, closed tab), the pipeline is closed after its current step."""
-        try:
-            while (event := await run_in_threadpool(next_event)) is not None:
-                if await request.is_disconnected():
-                    break
-                yield line(*event)
-        except Exception as error:   # the HTTP status is already sent: report the failure as an event
-            yield line("run.error", {"message": repr(error)})
-        finally:
-            # On disconnect this task is cancelled; shield the cleanup so it still runs.
-            # close() marks the source failed and closes the DB connection (a no-op if the run finished).
-            with anyio.CancelScope(shield=True):
-                await run_in_threadpool(events.close)
-
-    return StreamingResponse(stream(), media_type="application/x-ndjson")
+    if (media.size or 0) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Files are limited to 100 MB")
+    version = require_version(body.version_id)
+    log.info("run %s (%s): media %r, %s, %d bytes", body.run_id, version.id,
+             media.filename, media.content_type, media.size or 0)
+    events = state["pipeline"].run_media(version, body.run_id, media.file, media.filename or "recording")
+    return stream(request, body, version, events)
 
 
 # Mounted last so /api routes take priority

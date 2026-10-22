@@ -1,17 +1,21 @@
 """
-Request and response shapes of POST /api/analyse, matching the frontend contract
+Request and response shapes of the /api/analyse routes, matching the frontend contract
 (webapp/frontend/README.md). Pydantic validates them, so a malformed request gets a clear error.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class AnalyseRequest(BaseModel):
-    """The JSON body for text, or the 'metadata' field of a media upload."""
+class RunMetadata(BaseModel):
+    """Identifies a run: the 'metadata' field of a media upload."""
     run_id: str
     version_id: str
     config: dict = {}       # the frontend's copy of the version config; versions.py is the reference
-    text: str | None = None
+
+
+class TextRequest(RunMetadata):
+    """The JSON body of /api/analyse/text."""
+    text: str = Field(min_length=1, pattern=r"\S")   # at least one non-space character
 
 
 class SegmentOut(BaseModel):
