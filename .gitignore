@@ -13,3 +13,12 @@ app.db-shm
 *.db
 *.db-wal
 *.db-shm
+*.json
+*.log
+*.jinja
+.TAG
+*.txt
+*.safetansors
+.cache/huggingface/hub/CACHEDIR.TAG
+.cache/huggingface/hub/models--cross-encoder--nli-MiniLM2-L6-H768/snapshots/b95119ce93d3e065de6214e38cd4a97b0f2f2c6d/model.safetensors
+.cache/huggingface/hub/models--cross-encoder--nli-MiniLM2-L6-H768/refs/main
