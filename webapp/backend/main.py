@@ -93,12 +93,15 @@ async def analyse(request: Request):
     def line(type_, data):
         return Event(run_id=body.run_id, version_id=version.id, type=type_, data=data).model_dump_json() + "\n"
 
+    def next_event() -> tuple[str, dict] | None:
+        return next(events, None)   # None when the run is over
+
     async def stream():
         """One JSON event per line, sent as soon as the pipeline yields it. Each step runs in a
         worker thread, so Whisper, web search and NLI don't block the server. If the browser
         goes away (new run, closed tab), the pipeline is closed after its current step."""
         try:
-            while (event := await run_in_threadpool(lambda: next(events, None))) is not None:
+            while (event := await run_in_threadpool(next_event)) is not None:
                 if await request.is_disconnected():
                     break
                 yield line(*event)
