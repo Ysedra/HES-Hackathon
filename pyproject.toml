@@ -1,12 +1,12 @@
 [project]
 name = "hes-hackathon"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local live-transcription and evidence-based fact-checking prototype"
 readme = "README.md"
 authors = [
-    { name = "Alex", email = "alexis.kueny@outlook.com" }
+    { name = "HES-SO Hackathon Team" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "av<19",
     "datasets>=5.1.0",
@@ -20,6 +20,10 @@ dependencies = [
     "torch>=2.14.1",
     "torchcodec>=0.17.0",
     "transformers>=5.20.2",
+    "ddgs==9.16.0",
+    "trafilatura==2.3.1",
+    "pysbd>=0.3.4",
+    "fastapi[standard]>=0.159.1",
 ]
 
 [dependency-groups]

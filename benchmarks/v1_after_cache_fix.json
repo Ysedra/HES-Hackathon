@@ -1,0 +1,199 @@
+{
+  "description": "Observed live run before adding search fallback: persistent claim cache worked (5728.38 ms fresh, 0.46 ms hit); all benchmark factual searches failed. Outputs are original, not replay results.",
+  "outputs": {
+    "v1-load-definitions": [
+      {
+        "name": "stderr",
+        "output_type": "stream",
+        "text": [
+          "/Users/ysedra-usi/Documents/University/HES-SO/Semester 1/HES Hackathon/.venv/lib/python3.12/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html\n",
+          "  from .autonotebook import tqdm as notebook_tqdm\n"
+        ]
+      },
+      {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": [
+          "Model loading + first inference: 2194.8 ms\n"
+        ]
+      }
+    ],
+    "v1-config": [
+      {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": [
+          "Cache: database/v1_claim_cache.db\n",
+          "Verifier version: v1-exact:r2:cross-encoder/nli-MiniLM2-L6-H768@b95119ce93d3e065de6214e38cd4a97b0f2f2c6d:ed8a30b8aed031c5\n"
+        ]
+      }
+    ],
+    "v1-try": [
+      {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": [
+          "First supported | fresh | 5728.38 ms\n",
+          "Verification warnings: [\"https://discoverswiss.ch/cantons-of-switzerland/: ReadTimeout: HTTPSConnectionPool(host='discoverswiss.ch', port=443): Read timed out. (read timeout=2.999997093997081)\"]\n",
+          "Second supported | claims_cache | 0.46 ms\n",
+          "Verification warnings: [\"https://discoverswiss.ch/cantons-of-switzerland/: ReadTimeout: HTTPSConnectionPool(host='discoverswiss.ch', port=443): Read timed out. (read timeout=2.999997093997081)\"]\n",
+          "{\n",
+          "  \"claim\": \"Switzerland has 26 cantons.\",\n",
+          "  \"verdict\": \"supported\",\n",
+          "  \"evidence\": [\n",
+          "    {\n",
+          "      \"text\": \"The 26 cantons of Switzerland[note 1] are the member states of the Swiss Confederation. The nucleus of the Swiss Confederacy in the form of the first three confederate allies used to be referred to as the Waldst\\u00e4tte.\",\n",
+          "      \"url\": \"https://en.wikipedia.org/wiki/Cantons_of_Switzerland\",\n",
+          "      \"source_type\": \"search_snippet\",\n",
+          "      \"overlap\": 3,\n",
+          "      \"relevance\": 1.0,\n",
+          "      \"scores\": {\n",
+          "        \"contradiction\": 0.0010682886932045221,\n",
+          "        \"entailment\": 0.9938662648200989,\n",
+          "        \"neutral\": 0.005065358709543943\n",
+          "      },\n",
+          "      \"support_strength\": 0.9939,\n",
+          "      \"contradiction_strength\": 0.0011\n",
+          "    }\n",
+          "  ],\n",
+          "  \"errors\": [],\n",
+          "  \"warnings\": [\n",
+          "    \"https://discoverswiss.ch/cantons-of-switzerland/: ReadTimeout: HTTPSConnectionPool(host='discoverswiss.ch', port=443): Read timed out. (read timeout=2.999997093997081)\"\n",
+          "  ],\n",
+          "  \"explanation\": \"The retrieved evidence supports this claim.\",\n",
+          "  \"verified_claim_id\": 1,\n",
+          "  \"verified_at\": 1792675084916,\n",
+          "  \"expires_at\": 1792678684916,\n",
+          "  \"cache_hit\": true,\n",
+          "  \"path\": \"claims_cache\",\n",
+          "  \"timings_ms\": {\n",
+          "    \"cache_lookup\": 0.45,\n",
+          "    \"total\": 0.46\n",
+          "  }\n",
+          "}\n"
+        ]
+      }
+    ],
+    "v1-benchmark": [
+      {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": [
+          "Uncached (same retrieval) | uncertain | fresh | 119.43 ms | Switzerland has 26 cantons.\n",
+          "Uncached (same retrieval) | uncertain | fresh | 119.55 ms | Paris is the capital of Germany.\n",
+          "Uncached (same retrieval) | uncertain | fresh | 114.47 ms | The Moon is a natural satellite of Earth.\n",
+          "Uncached (same retrieval) | not_checkable | fresh | 0.02 ms | I think Switzerland is beautiful.\n",
+          "Uncached (same retrieval) | not_checkable | fresh | 0.01 ms | What is the capital of France?\n",
+          "V1 cold | uncertain | fresh | 139.31 ms | Switzerland has 26 cantons.\n",
+          "V1 cold | uncertain | fresh | 113.69 ms | Paris is the capital of Germany.\n",
+          "V1 cold | uncertain | fresh | 131.49 ms | The Moon is a natural satellite of Earth.\n",
+          "V1 cold | not_checkable | None | 0.35 ms | I think Switzerland is beautiful.\n",
+          "V1 cold | not_checkable | None | 0.08 ms | What is the capital of France?\n",
+          "V1 warm | uncertain | fresh | 226.79 ms | Switzerland has 26 cantons.\n",
+          "V1 warm | uncertain | fresh | 126.68 ms | Paris is the capital of Germany.\n",
+          "V1 warm | uncertain | fresh | 284.41 ms | The Moon is a natural satellite of Earth.\n",
+          "V1 warm | not_checkable | None | 0.95 ms | I think Switzerland is beautiful.\n",
+          "V1 warm | not_checkable | None | 0.15 ms | What is the capital of France?\n",
+          "{\n",
+          "  \"retrieval_mode\": \"live_web_bounded\",\n",
+          "  \"retrieval_settings\": {\n",
+          "    \"search_timeout_seconds\": 4,\n",
+          "    \"search_backend\": \"duckduckgo\",\n",
+          "    \"page_timeout_seconds\": 3,\n",
+          "    \"page_budget_seconds\": 8,\n",
+          "    \"max_download_bytes\": 1000000,\n",
+          "    \"max_redirects\": 2\n",
+          "  },\n",
+          "  \"model_startup_ms\": 2194.8,\n",
+          "  \"verifier_version\": \"v1-exact:r2:cross-encoder/nli-MiniLM2-L6-H768@b95119ce93d3e065de6214e38cd4a97b0f2f2c6d:ed8a30b8aed031c5\",\n",
+          "  \"cache_ttl_seconds\": 3600,\n",
+          "  \"cache_capacity\": 1000,\n",
+          "  \"runs\": {\n",
+          "    \"Uncached (same retrieval)\": {\n",
+          "      \"all_factual\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 119.43,\n",
+          "        \"p95_ms\": 119.55,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"cache_hits_only\": {\n",
+          "        \"count\": 0,\n",
+          "        \"p50_ms\": null,\n",
+          "        \"p95_ms\": null,\n",
+          "        \"under_1_second_percent\": null\n",
+          "      },\n",
+          "      \"cache_misses_only\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 119.43,\n",
+          "        \"p95_ms\": 119.55,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"claim_cache_hit_percent\": 0.0,\n",
+          "      \"verdict_accuracy\": 0,\n",
+          "      \"inputs_with_search_errors\": 3,\n",
+          "      \"inputs_with_verification_warnings\": 0\n",
+          "    },\n",
+          "    \"V1 cold\": {\n",
+          "      \"all_factual\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 131.49,\n",
+          "        \"p95_ms\": 139.31,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"cache_hits_only\": {\n",
+          "        \"count\": 0,\n",
+          "        \"p50_ms\": null,\n",
+          "        \"p95_ms\": null,\n",
+          "        \"under_1_second_percent\": null\n",
+          "      },\n",
+          "      \"cache_misses_only\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 131.49,\n",
+          "        \"p95_ms\": 139.31,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"claim_cache_hit_percent\": 0.0,\n",
+          "      \"verdict_accuracy\": 0,\n",
+          "      \"inputs_with_search_errors\": 3,\n",
+          "      \"inputs_with_verification_warnings\": 0\n",
+          "    },\n",
+          "    \"V1 warm\": {\n",
+          "      \"all_factual\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 226.79,\n",
+          "        \"p95_ms\": 284.41,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"cache_hits_only\": {\n",
+          "        \"count\": 0,\n",
+          "        \"p50_ms\": null,\n",
+          "        \"p95_ms\": null,\n",
+          "        \"under_1_second_percent\": null\n",
+          "      },\n",
+          "      \"cache_misses_only\": {\n",
+          "        \"count\": 3,\n",
+          "        \"p50_ms\": 226.79,\n",
+          "        \"p95_ms\": 284.41,\n",
+          "        \"under_1_second_percent\": 100.0\n",
+          "      },\n",
+          "      \"claim_cache_hit_percent\": 0.0,\n",
+          "      \"verdict_accuracy\": 0,\n",
+          "      \"inputs_with_search_errors\": 3,\n",
+          "      \"inputs_with_verification_warnings\": 0\n",
+          "    }\n",
+          "  }\n",
+          "}\n"
+        ]
+      }
+    ],
+    "v1-inspect": [
+      {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": [
+          "(1, 'Switzerland has 26 cantons.', 'supported', 1, 1792675084916, 1792678684916)\n"
+        ]
+      }
+    ]
+  }
+}

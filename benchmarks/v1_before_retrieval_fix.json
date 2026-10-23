@@ -1,0 +1,45 @@
+{
+  "description": "Actual user-run V1 results before the retrieval and cache-eligibility fix. Independent live web searches; not a controlled benchmark.",
+  "recorded_date": "2026-10-22",
+  "summary": {
+    "retrieval_mode": "live_web",
+    "model_startup_ms": 1887.1,
+    "verifier_version": "v1-exact:cross-encoder/nli-MiniLM2-L6-H768@b95119ce93d3e065de6214e38cd4a97b0f2f2c6d:773049868155da6a",
+    "cache_ttl_seconds": 3600,
+    "cache_capacity": 1000,
+    "runs": {
+      "V0": {
+        "factual_inputs": 3,
+        "p50_ms": 4341.8,
+        "p95_ms": 32501.21,
+        "under_1_second_percent": 0,
+        "claim_cache_hits": 0,
+        "claim_cache_hit_percent": 0,
+        "verdict_accuracy": 0.6666666666666666,
+        "inputs_with_retrieval_errors": 2
+      },
+      "V1 cold": {
+        "factual_inputs": 3,
+        "p50_ms": 4804.6,
+        "p95_ms": 6874.87,
+        "under_1_second_percent": 0,
+        "claim_cache_hits": 0,
+        "claim_cache_hit_percent": 0,
+        "verdict_accuracy": 0.6666666666666666,
+        "inputs_with_retrieval_errors": 1
+      },
+      "V1 warm": {
+        "factual_inputs": 3,
+        "p50_ms": 0.5,
+        "p95_ms": 116858.77,
+        "under_1_second_percent": 66.66666666666667,
+        "claim_cache_hits": 2,
+        "claim_cache_hit_percent": 66.66666666666667,
+        "verdict_accuracy": 1,
+        "inputs_with_retrieval_errors": 0
+      }
+    }
+  },
+  "two_call_example_output": "First uncertain | fresh | 3545.87 ms\nRetrieval errors: ['Search failed: No results found.']\nSecond supported | fresh | 35023.73 ms\nRetrieval errors: ['https://discoverswiss.ch/cantons-of-switzerland/: no readable text']\n{\n  \"claim\": \"Switzerland has 26 cantons.\",\n  \"verdict\": \"supported\",\n  \"evidence\": [\n    {\n      \"text\": \"The 26 cantons of Switzerland[note 1] are the member states of the Swiss Confederation. The nucleus of the Swiss Confederacy in the form of the first three confederate allies used to be referred to as the Waldst\\u00e4tte.\",\n      \"url\": \"https://en.wikipedia.org/wiki/Cantons_of_Switzerland\",\n      \"source_type\": \"search_snippet\",\n      \"overlap\": 3,\n      \"relevance\": 1.0,\n      \"scores\": {\n        \"contradiction\": 0.0010682886932045221,\n        \"entailment\": 0.9938662648200989,\n        \"neutral\": 0.005065358709543943\n      },\n      \"support_strength\": 0.9939,\n      \"contradiction_strength\": 0.0011\n    }\n  ],\n  \"errors\": [\n    \"https://discoverswiss.ch/cantons-of-switzerland/: no readable text\"\n  ],\n  \"timings_ms\": {\n    \"checkability\": 0.03,\n    \"search\": 2070.25,\n    \"retrieval\": 32801.71,\n    \"verification\": 151.62,\n    \"total\": 35023.73,\n    \"cache_lookup\": 0.08,\n    \"cache_write\": 0.0\n  },\n  \"cache_hit\": false,\n  \"path\": \"fresh\",\n  \"explanation\": \"The retrieved evidence supports this claim.\"\n}\n",
+  "benchmark_output": "V0 | supported | fresh | 32501.21 ms | Switzerland has 26 cantons.\nV0 | contradicted | fresh | 4341.8 ms | Paris is the capital of Germany.\nV0 | uncertain | fresh | 3116.11 ms | The Moon is a natural satellite of Earth.\nV0 | not_checkable | fresh | 0.02 ms | I think Switzerland is beautiful.\nV0 | not_checkable | fresh | 0.01 ms | What is the capital of France?\nV1 cold | uncertain | fresh | 2535.04 ms | Switzerland has 26 cantons.\nV1 cold | contradicted | fresh | 6874.87 ms | Paris is the capital of Germany.\nV1 cold | supported | fresh | 4804.6 ms | The Moon is a natural satellite of Earth.\nV1 cold | not_checkable | None | 0.33 ms | I think Switzerland is beautiful.\nV1 cold | not_checkable | None | 0.08 ms | What is the capital of France?\nV1 warm | supported | fresh | 116858.77 ms | Switzerland has 26 cantons.\nV1 warm | contradicted | claims_cache | 0.5 ms | Paris is the capital of Germany.\nV1 warm | supported | claims_cache | 0.16 ms | The Moon is a natural satellite of Earth.\nV1 warm | not_checkable | None | 0.06 ms | I think Switzerland is beautiful.\nV1 warm | not_checkable | None | 0.04 ms | What is the capital of France?\n{\n  \"retrieval_mode\": \"live_web\",\n  \"model_startup_ms\": 1887.1,\n  \"verifier_version\": \"v1-exact:cross-encoder/nli-MiniLM2-L6-H768@b95119ce93d3e065de6214e38cd4a97b0f2f2c6d:773049868155da6a\",\n  \"cache_ttl_seconds\": 3600,\n  \"cache_capacity\": 1000,\n  \"runs\": {\n    \"V0\": {\n      \"factual_inputs\": 3,\n      \"p50_ms\": 4341.8,\n      \"p95_ms\": 32501.21,\n      \"under_1_second_percent\": 0.0,\n      \"claim_cache_hits\": 0,\n      \"claim_cache_hit_percent\": 0.0,\n      \"verdict_accuracy\": 0.6666666666666666,\n      \"inputs_with_retrieval_errors\": 2\n    },\n    \"V1 cold\": {\n      \"factual_inputs\": 3,\n      \"p50_ms\": 4804.6,\n      \"p95_ms\": 6874.87,\n      \"under_1_second_percent\": 0.0,\n      \"claim_cache_hits\": 0,\n      \"claim_cache_hit_percent\": 0.0,\n      \"verdict_accuracy\": 0.6666666666666666,\n      \"inputs_with_retrieval_errors\": 1\n    },\n    \"V1 warm\": {\n      \"factual_inputs\": 3,\n      \"p50_ms\": 0.5,\n      \"p95_ms\": 116858.77,\n      \"under_1_second_percent\": 66.66666666666667,\n      \"claim_cache_hits\": 2,\n      \"claim_cache_hit_percent\": 66.66666666666667,\n      \"verdict_accuracy\": 1,\n      \"inputs_with_retrieval_errors\": 0\n    }\n  }\n}\n"
+}
