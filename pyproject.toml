@@ -9,7 +9,10 @@ authors = [
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "av<19",
-    "datasets>=5.1.0",
+    # datasets 5.x requires huggingface-hub 1.x, while Transformers 4.46 on
+    # Intel Macs requires huggingface-hub below 1.0.
+    "datasets==3.6.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "datasets>=5.1.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "faster-whisper>=1.2.1",
     "jiwer>=4.0.0",
     "sherpa-onnx>=1.13.8",
@@ -17,9 +20,18 @@ dependencies = [
     "soundcard>=0.4.6",
     "sounddevice>=0.5.6",
     "sqlite-vec>=0.1.9",
-    "torch>=2.14.1",
-    "torchcodec>=0.17.0",
-    "transformers>=5.20.2",
+    # PyTorch 2.2.2 is the last official release with Intel Mac wheels.
+    "numpy==1.26.4; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    # ONNX Runtime 1.23.2 still ships a CPython 3.12 Intel Mac wheel. Newer
+    # releases are ARM-only on macOS, but faster-whisper requires this runtime.
+    "onnxruntime==1.23.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch>=2.14.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    # TorchCodec does not support the Intel Mac/PyTorch 2.2 combination and is
+    # only used by an optional ASR experiment, not the web application.
+    "torchcodec>=0.17.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "transformers==4.46.3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "transformers>=5.20.2; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "ddgs==9.16.0",
     "trafilatura==2.3.1",
     "pysbd>=0.3.4",
@@ -31,9 +43,7 @@ dev = [
     "ipykernel>=7.4.0",
 ]
 
-[project.scripts]
-hes-hackathon = "hes_hackathon:main"
-
-[build-system]
-requires = ["uv_build>=0.12.19,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+# This repository contains notebooks and runnable scripts, not an installable
+# hes_hackathon Python package.
+package = false

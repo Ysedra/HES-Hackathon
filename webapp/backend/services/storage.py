@@ -11,7 +11,10 @@ import time
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[3] / "database" / "app.db"
+CACHE_DB_PATH = DB_PATH.with_name("v1_claim_cache.db")
 VERDICT_TTL_MS = 7 * 24 * 60 * 60 * 1000   # how long a verdict stays reusable in verified_claims
+CACHE_TTL_MS = 60 * 60 * 1000
+MAX_CACHE_ENTRIES = 1000
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources (
@@ -140,6 +143,21 @@ def init_db(path=DB_PATH):
         con.close()
 
 
+def init_claim_cache():
+    """Create/migrate V1's separate verified-claim cache."""
+    init_db(CACHE_DB_PATH)
+    con = connect(CACHE_DB_PATH)
+    try:
+        columns = {row[1] for row in con.execute("PRAGMA table_info(verified_claims)")}
+        if "warnings_json" not in columns:
+            with con:
+                con.execute(
+                    "ALTER TABLE verified_claims ADD COLUMN warnings_json TEXT NOT NULL DEFAULT '[]'"
+                )
+    finally:
+        con.close()
+
+
 def create_source(con, source_url):
     with con:  # create the source row first, so the DB shows it straight away
         cur = con.execute("INSERT INTO sources (source_url, status) VALUES (?, 'transcribing')",
@@ -178,13 +196,13 @@ def insert_checking_claim(con, source_id, sentence, stable_at):
     return claim_id
 
 
-def save_result(con, claim_id, result, model_version, stance):
+def save_result(con, claim_id, result, model_version, stance, path="fresh"):
     """Store check_claim's verdict, evidence and timings; this stops the latency stopwatch.
     stance(passage) gives each passage's stance. Returns verdict_at."""
     verdict_at = now_ms()
     timings_json = json.dumps(result["timings_ms"])
     with con:
-        if result["verdict"] == "not_checkable":
+        if result["verdict"] in {"not_checkable", "retrieval_failed"}:
             con.execute(
                 "UPDATE claims SET status = 'not_checked', verdict_at = ?, timings_json = ? WHERE id = ?",
                 (verdict_at, timings_json, claim_id),
@@ -192,9 +210,11 @@ def save_result(con, claim_id, result, model_version, stance):
             return verdict_at
 
         cur = con.execute(
-            """INSERT INTO verified_claims (claim_text, verdict, verified_at, expires_at, model_version)
-               VALUES (?, ?, ?, ?, ?)""",
-            (result["claim"], result["verdict"], verdict_at, verdict_at + VERDICT_TTL_MS, model_version),
+            """INSERT INTO verified_claims
+               (claim_text, verdict, explanation, verified_at, expires_at, model_version)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (result["claim"], result["verdict"], result.get("explanation"), verdict_at,
+             verdict_at + VERDICT_TTL_MS, model_version),
         )
         verified_claim_id = cur.lastrowid
 
@@ -205,6 +225,7 @@ def save_result(con, claim_id, result, model_version, stance):
             )
             scores = {
                 "relevance": passage["relevance"],
+                "source_type": passage.get("source_type", "page"),
                 **passage["scores"],                              # entailment, neutral, contradiction
                 "support_strength": passage["support_strength"],
                 "contradiction_strength": passage["contradiction_strength"],
@@ -217,11 +238,153 @@ def save_result(con, claim_id, result, model_version, stance):
 
         con.execute(
             """UPDATE claims
-               SET status = ?, verified_claim_id = ?, path = 'fresh', verdict_at = ?, timings_json = ?
+               SET status = ?, verified_claim_id = ?, path = ?, verdict_at = ?, timings_json = ?
                WHERE id = ?""",
-            (result["verdict"], verified_claim_id, verdict_at, timings_json, claim_id),
+            (result["verdict"], verified_claim_id, path, verdict_at, timings_json, claim_id),
         )
     return verdict_at
+
+
+def normalise_claim(text):
+    """V1's deliberately conservative key: exact text after whitespace normalisation."""
+    return " ".join(text.split()).strip()
+
+
+def _delete_cached_claims(con, claim_ids):
+    for cached_id in claim_ids:
+        evidence_ids = con.execute(
+            "SELECT evidence_id FROM verdict_evidence WHERE verified_claim_id = ?",
+            (cached_id,),
+        ).fetchall()
+        con.execute("DELETE FROM verified_claims WHERE id = ?", (cached_id,))
+        for (evidence_id,) in evidence_ids:
+            con.execute(
+                """DELETE FROM evidence WHERE id = ?
+                   AND NOT EXISTS (
+                     SELECT 1 FROM verdict_evidence WHERE evidence_id = evidence.id
+                   )""",
+                (evidence_id,),
+            )
+
+
+def prune_claim_cache(con):
+    """Remove expired V1 entries, then apply the notebook's LRU capacity."""
+    expired = con.execute(
+        """SELECT id FROM verified_claims
+           WHERE model_version LIKE 'v1-exact:%' AND expires_at <= ?""",
+        (now_ms(),),
+    ).fetchall()
+    _delete_cached_claims(con, [row[0] for row in expired])
+    overflow = con.execute(
+        """SELECT id FROM verified_claims
+           WHERE model_version LIKE 'v1-exact:%'
+           ORDER BY COALESCE(last_used_at, verified_at) DESC, id DESC
+           LIMIT -1 OFFSET ?""",
+        (MAX_CACHE_ENTRIES,),
+    ).fetchall()
+    _delete_cached_claims(con, [row[0] for row in overflow])
+
+
+def lookup_cached_claim(con, text, cache_model_version):
+    """Return a still-valid exact V1 verdict together with its original citations."""
+    row = con.execute(
+        """SELECT id, verdict, explanation, warnings_json
+           FROM verified_claims
+           WHERE claim_text = ? AND model_version = ? AND expires_at > ?
+             AND verdict IN ('supported', 'contradicted')
+           ORDER BY verified_at DESC, id DESC LIMIT 1""",
+        (normalise_claim(text), cache_model_version, now_ms()),
+    ).fetchone()
+    if row is None:
+        return None
+
+    cached_id, verdict, explanation, warnings_json = row
+    rows = con.execute(
+        """SELECT e.evidence_text, e.source_url, ve.scores_json
+           FROM verdict_evidence AS ve
+           JOIN evidence AS e ON e.id = ve.evidence_id
+           WHERE ve.verified_claim_id = ? ORDER BY e.id""",
+        (cached_id,),
+    ).fetchall()
+    if not rows:
+        return None
+
+    evidence = []
+    for passage, url, metadata_json in rows:
+        metadata = json.loads(metadata_json or "{}")
+        evidence.append({"text": passage, "url": url, **metadata})
+    with con:
+        con.execute(
+            """UPDATE verified_claims
+               SET last_used_at = ?, hit_count = hit_count + 1 WHERE id = ?""",
+            (now_ms(), cached_id),
+        )
+    return {
+        "claim": text,
+        "verdict": verdict,
+        "explanation": explanation,
+        "evidence": evidence,
+        "errors": json.loads(warnings_json or "[]"),
+    }
+
+
+def save_cached_claim(con, text, result, cache_model_version):
+    """Cache only cited page-backed verdicts; uncertain/retrieval failures remain misses."""
+    if result["verdict"] not in {"supported", "contradicted"} or not result["evidence"]:
+        return False
+    if not all(passage.get("text") and passage.get("url") for passage in result["evidence"]):
+        return False
+    if not all(passage.get("source_type") == "page" for passage in result["evidence"]):
+        return False
+
+    verified_at = now_ms()
+    claim_text = normalise_claim(text)
+    with con:
+        previous = con.execute(
+            "SELECT id FROM verified_claims WHERE claim_text = ? AND model_version = ?",
+            (claim_text, cache_model_version),
+        ).fetchall()
+        _delete_cached_claims(con, [row[0] for row in previous])
+        cur = con.execute(
+            """INSERT INTO verified_claims
+               (claim_text, verdict, explanation, verified_at, expires_at,
+                model_version, last_used_at, warnings_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (claim_text, result["verdict"], result.get("explanation"), verified_at,
+             verified_at + CACHE_TTL_MS, cache_model_version, verified_at,
+             json.dumps(result.get("errors", []))),
+        )
+        cached_id = cur.lastrowid
+        for passage in result["evidence"]:
+            evidence_id = con.execute(
+                "INSERT INTO evidence (evidence_text, source_url, fetched_at) VALUES (?, ?, ?)",
+                (passage["text"], passage["url"], verified_at),
+            ).lastrowid
+            metadata = {key: value for key, value in passage.items() if key not in {"text", "url"}}
+            con.execute(
+                """INSERT INTO verdict_evidence
+                   (verified_claim_id, evidence_id, stance, scores_json)
+                   VALUES (?, ?, ?, ?)""",
+                (cached_id, evidence_id,
+                 "supports" if result["verdict"] == "supported" else "contradicts",
+                 json.dumps(metadata)),
+            )
+        prune_claim_cache(con)
+    return True
+
+
+def clear_claim_cache():
+    """Clear only V1 experiment-cache verdicts and their unreferenced evidence."""
+    con = connect(CACHE_DB_PATH)
+    try:
+        with con:
+            rows = con.execute(
+                "SELECT id FROM verified_claims WHERE model_version LIKE 'v1-exact:%'"
+            ).fetchall()
+            _delete_cached_claims(con, [row[0] for row in rows])
+        return len(rows)
+    finally:
+        con.close()
 
 
 def mark_claim_failed(con, claim_id):

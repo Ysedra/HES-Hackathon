@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from api_helpers import FrontendFiles, require_version, stream
 from pipeline import Pipeline
 from schemas import RunMetadata, TextRequest
+from services import storage
 from versions import VERSIONS
 
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
@@ -57,6 +58,14 @@ async def health():
     """Polled by the frontend's connection status. The models are loaded before the server
     accepts requests, so any answer means the backend is ready."""
     return {"status": "ok", "versions": list(VERSIONS)}
+
+
+@app.post("/api/cache/claims/clear")
+async def clear_claim_cache():
+    """Reset only the separate V1 experiment cache; run history stays untouched."""
+    cleared = storage.clear_claim_cache()
+    log.info("cleared %d V1 claim-cache entries", cleared)
+    return {"cleared": cleared}
 
 
 @app.post("/api/analyse/text")

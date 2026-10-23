@@ -16,14 +16,23 @@ the segments.
 """
 
 import logging
+import json
+import platform
 import queue
+import shutil
+import subprocess
+import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
-from typing import BinaryIO, Iterator
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO, Iterator
 
 import numpy as np
-from faster_whisper import WhisperModel, decode_audio
+
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
 
 SAMPLE_RATE = 16000   # Whisper expects 16 kHz mono audio
 LANGUAGE = "en"       # must be the language of the audio, a wrong language is very slow
@@ -50,8 +59,55 @@ class Segment:
     text: str
 
 
-def load_model() -> WhisperModel:
+def load_model() -> "WhisperModel":
+    # Lazy import is essential on Intel macOS: merely importing CTranslate2 loads its copy
+    # of libiomp5, which later collides with PyTorch even if Whisper runs in a child process.
+    from faster_whisper import WhisperModel
+
     return WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE, cpu_threads=CPU_THREADS)
+
+
+def needs_isolated_worker() -> bool:
+    """Intel macOS wheels for PyTorch and CTranslate2 bundle separate OpenMP runtimes.
+
+    Loading both models in one process aborts Python with OpenMP error #15. Keep Whisper in
+    a child process on that platform; Linux, Windows and Apple Silicon retain the normal path.
+    """
+    return sys.platform == "darwin" and platform.machine() == "x86_64"
+
+
+def transcribe_file_isolated(source: BinaryIO, name: str) -> Iterator[Segment]:
+    """Transcribe in a child process so CTranslate2 cannot collide with PyTorch's OpenMP."""
+    suffix = Path(name).suffix if Path(name).suffix else ".media"
+    backend_dir = Path(__file__).resolve().parents[1]
+
+    with tempfile.NamedTemporaryFile(suffix=suffix) as media:
+        shutil.copyfileobj(source, media)
+        media.flush()
+        command = [sys.executable, "-u", "-m", "services.transcription", "--worker", media.name]
+        process = subprocess.Popen(
+            command,
+            cwd=backend_dir,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        try:
+            for line in process.stdout:
+                message = json.loads(line)
+                yield Segment(**message["segment"])
+            return_code = process.wait()
+            if return_code:
+                raise RuntimeError(f"Whisper worker exited with status {return_code}")
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
 
 
 class StreamTranscriber:
@@ -119,6 +175,8 @@ def transcribe_file(model, source: str | BinaryIO, **settings) -> Iterator[Segme
 
     source is a path or a file-like object; PyAV decodes the actual format (mp3, WebM/Opus,
     MP4, Ogg...) and resamples it to 16 kHz mono, so browser recordings work as they are."""
+    from faster_whisper import decode_audio
+
     audio = decode_audio(source, sampling_rate=SAMPLE_RATE)
     log.info("decoded %.1f s of audio", len(audio) / SAMPLE_RATE)
     if not len(audio):
@@ -157,3 +215,14 @@ def transcribe_live(model, stop: threading.Event, source="loopback", **settings)
     while (chunk := chunks.get()) is not None:
         yield from transcriber.feed(chunk)
     yield from transcriber.flush()
+
+
+def _worker_main(path: str) -> None:
+    """JSON-lines worker used only by transcribe_file_isolated()."""
+    model = load_model()
+    for segment in transcribe_file(model, path):
+        print(json.dumps({"segment": segment.__dict__}), flush=True)
+
+
+if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--worker":
+    _worker_main(sys.argv[2])

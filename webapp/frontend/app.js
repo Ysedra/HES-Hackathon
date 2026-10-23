@@ -1,10 +1,10 @@
 /* Dependency-free UI. Models, caches and claim extraction belong to the Python backend. */
 const VERSIONS = [
-  { id: "baseline", label: "Baseline", spec: "0 caches · 1 AI · sequential", description: "Fresh retrieval and verification for every claim.", config: { caches: [], extraction: "rules", ai_count: 1, parallel: false } },
-  { id: "claim-cache", label: "Claim cache", spec: "1 cache · 1 AI · sequential", description: "Reuse a still-valid verdict for an equivalent claim.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: false } },
-  { id: "two-ai", label: "Two AI stages", spec: "1 cache · 2 AI · sequential", description: "Model-based claim extraction, followed by evidence verification.", config: { caches: ["claims"], extraction: "model", ai_count: 2, parallel: false } },
-  { id: "two-caches", label: "Two cache layers", spec: "2 caches · 2 AI · sequential", description: "Reuse verdicts first, then evidence passages before web retrieval.", config: { caches: ["claims", "evidence"], extraction: "model", ai_count: 2, parallel: false } },
-  { id: "parallel", label: "Complete pipeline", spec: "2 caches · 2 AI · parallel", description: "The full pipeline with bounded parallel processing.", config: { caches: ["claims", "evidence"], extraction: "model", ai_count: 2, parallel: true } }
+  { id: "baseline", stage: "BASELINE", label: "Baseline", spec: "0 caches · 1 AI · sequential", description: "Fresh, deterministic Wikipedia-first retrieval and verification for every claim.", config: { caches: [], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
+  { id: "claim-cache", stage: "IMPLEMENTED", label: "Claim cache", spec: "1 cache · 1 AI · sequential", description: "Reuse only page-backed verdicts; failed and uncertain checks are never cached.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
+  { id: "two-ai", stage: "PLANNED", label: "Two AI stages", spec: "1 cache · 2 AI · sequential", description: "Model-based claim extraction plus verification, with Wikipedia-first retrieval and web fallbacks.", config: { caches: ["claims"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_first" } },
+  { id: "two-caches", stage: "PLANNED", label: "Two cache layers", spec: "2 caches · 2 AI · Wikipedia only", description: "Add a page-evidence cache and deliberately limit retrieval to Wikipedia for a controlled source experiment.", config: { caches: ["claims", "evidence"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_only" } },
+  { id: "parallel", stage: "PROTOTYPE", label: "Parallel pipeline", spec: "Current V1 · 3 workers", description: "Runs the current V1 components concurrently to isolate the speedup. V2 and V3 will be added to this V4 target later.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: true, source_policy: "wikipedia_first" } }
 ];
 const STATUS = { not_checked: "Not checked", not_checkable: "Not checkable", checking: "Checking", supported: "Supported", contradicted: "Contradicted", uncertain: "Uncertain" };
 const ROUTES = { fresh: "Fresh retrieval", claims_cache: "Claim cache", evidence_cache: "Evidence cache" };
@@ -59,7 +59,7 @@ function beginRun(preview = false) {
 function renderVersions() {
   $("versionList").innerHTML = VERSIONS.map((item, index) => `
     <button type="button" class="version-card" data-version="${item.id}" aria-pressed="${item.id === state.version}" ${state.busy || state.recorder || state.requestingMic ? "disabled" : ""}>
-      <span class="version-top"><span>VERSION ${String(index).padStart(2, "0")} · ${index ? "PLANNED" : "BASELINE"}</span><i class="version-radio" aria-hidden="true"></i></span>
+      <span class="version-top"><span>VERSION ${String(index).padStart(2, "0")} · ${item.stage}</span><i class="version-radio" aria-hidden="true"></i></span>
       <strong>${item.label}</strong><span class="spec">${item.spec}</span>
     </button>`).join("");
   $("versionList").querySelectorAll("[data-version]").forEach(button => button.addEventListener("click", () => selectVersion(button.dataset.version)));
@@ -67,7 +67,8 @@ function renderVersions() {
   $("pipelineSummary").innerHTML = [
     version().config.extraction === "model" ? "AI extraction" : "Rule extraction",
     ...version().config.caches.map(cache => cache === "claims" ? "Claim cache" : "Evidence cache"),
-    "NLI verification", version().config.parallel ? "Parallel" : "Sequential"
+    version().config.source_policy === "wikipedia_only" ? "Wikipedia only" : "Wikipedia first + web fallback",
+    "NLI verification", version().config.parallel ? "3 parallel workers" : "Sequential"
   ].map(label => `<span>${label}</span>`).join("");
 }
 function selectVersion(id) {
@@ -138,7 +139,7 @@ function renderInspector() {
       <p class="detail-claim">${esc(claim.claim_text)}</p>
       <div class="detail-meta"><span>${esc(ROUTES[claim.path] || "Route pending")}</span><span>${formatMs(claim.latency_ms)}</span><span>${claim.segment_ids.length} source segment(s)</span></div>
     </div>
-    <section class="inspector-section"><h3>Assessment</h3><p>${esc(claim.explanation || (claim.status === "checking" ? "The pipeline is checking this claim." : "The backend has not provided an assessment."))}</p></section>
+    <section class="inspector-section"><h3>${claim.status === "uncertain" ? "Why uncertain" : claim.status === "not_checked" ? "Why not checked" : "Assessment"}</h3><p>${esc(claim.explanation || (claim.status === "checking" ? "The pipeline is checking this claim." : "The backend has not provided an assessment."))}</p></section>
     <section class="inspector-section">
       <div class="score-header"><h3>Model confidence score</h3><strong>${confidence === null ? "—" : Math.round(confidence * 100) + "%"}</strong></div>
       <div class="score-track"><span style="width:${(confidence || 0) * 100}%"></span></div>
@@ -193,6 +194,7 @@ function render() {
   $("uploadButton").disabled = locked;
   $("demoButton").disabled = locked;
   $("clearButton").disabled = Boolean(state.recorder) || state.requestingMic;
+  $("clearCacheButton").disabled = locked || !state.backend;
   $("micButton").disabled = state.requestingMic || (state.busy && !state.recorder);
 }
 function setRunNotice(run, text, kind = "") {
@@ -425,6 +427,21 @@ function connect(url = "/events") {
   source.onerror = () => { $("connectionStatus").textContent = "Event stream reconnecting…"; $("connectionStatus").classList.remove("connected"); };
   return source;
 }
+async function clearClaimCache() {
+  if (state.busy || !state.backend) return;
+  if (!window.confirm("Clear the V1 verified-claim cache? Transcript runs and the main database will not be changed.")) return;
+  $("clearCacheButton").disabled = true;
+  try {
+    const response = await fetch("/api/cache/claims/clear", { method: "POST" });
+    if (!response.ok) throw new Error(`Backend returned HTTP ${response.status}.`);
+    const result = await response.json();
+    setRunNotice(activeRun(), `V1 claim cache cleared (${result.cleared ?? 0} entries). Your run history was kept.`);
+  } catch (error) {
+    setRunNotice(activeRun(), `Could not clear the V1 cache: ${error.message}`, "error");
+  } finally {
+    render();
+  }
+}
 $("textForm").addEventListener("submit", event => {
   event.preventDefault();
   const text = $("testText").value.trim();
@@ -434,6 +451,7 @@ $("textForm").addEventListener("submit", event => {
 $("micButton").addEventListener("click", toggleMic);
 $("demoButton").addEventListener("click", demo);
 $("clearButton").addEventListener("click", () => beginRun());
+$("clearCacheButton").addEventListener("click", clearClaimCache);
 $("claimsOnly").addEventListener("change", renderTranscript);
 $("uploadButton").addEventListener("click", () => $("mediaInput").click());
 $("mediaInput").addEventListener("change", event => {

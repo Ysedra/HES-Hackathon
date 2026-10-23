@@ -20,7 +20,7 @@
   <div class="section-heading"><h2 id="versionsTitle">01 <span>Pipeline version</span></h2><span>Compare architecture, not just verdicts</span></div>
   <div id="versionList" class="version-list" role="group" aria-label="Select experiment version"></div>
   <div class="pipeline-summary"><span id="versionDescription"></span><span id="pipelineSummary" class="pipeline-pills"></span></div>
-  <p class="subtle definition-note">Working definition: cache 1 = verified claims; cache 2 = evidence. AI 1 = verification; adding AI 2 replaces rule-based claim extraction with a model. Versions beyond the baseline are planned, not implemented by this selector.</p>
+  <p class="subtle definition-note">Working definition: cache 1 = verified claims; cache 2 = evidence. AI 1 = verification; AI 2 extracts checkable claims. V0 and V1 are implemented; V2/V3 are planned; V3 is the Wikipedia-only source experiment. V4 currently runs V1's work in parallel so its speed effect can be measured separately.</p>
 </section>
 <section class="workspace">
   <div class="left-column">
@@ -50,6 +50,7 @@
       <div class="panel-heading"><h2>03 <span>Run measurements</span></h2><span id="metricKind" class="small-pill">NO RUN YET</span></div>
       <dl class="metrics"><div><dt>p50 verification</dt><dd id="metricP50">—</dd></div><div><dt>p95 verification</dt><dd id="metricP95">—</dd></div><div><dt>Cache hits</dt><dd id="metricCache">—</dd></div><div><dt>Queue depth</dt><dd id="metricQueue">—</dd></div></dl>
       <p class="subtle">Reported by the backend for this version and run. Preview fixtures never count as benchmark measurements.</p>
+      <button id="clearCacheButton" class="text-button" type="button">Clear V1 claim cache</button>
     </article>
   </div>
   <article class="panel output-panel">
@@ -57,7 +58,7 @@
     <div id="runNotice" class="run-notice" role="status" aria-live="polite">Ready for input. Live transcription and verification need the local backend.</div>
     <div class="output-toolbar"><span id="claimCount">0 claims</span><label><input id="claimsOnly" type="checkbox"> Claims only</label></div>
     <div id="transcriptStream" class="transcript-stream"></div>
-    <div class="legend"><span class="supported">● Supported</span><span class="contradicted">● Contradicted</span><span class="uncertain">● Uncertain</span><span class="checking">● Checking</span></div>
+    <div class="legend"><span class="supported">● Supported</span><span class="contradicted">● Contradicted</span><span class="uncertain">● Uncertain</span><span>● Not checked</span><span class="checking">● Checking</span></div>
   </article>
   <aside class="panel inspector" aria-labelledby="inspectorTitle">
     <div class="panel-heading"><h2 id="inspectorTitle">05 <span>Claim inspector</span></h2><span class="small-pill">EVIDENCE FIRST</span></div>

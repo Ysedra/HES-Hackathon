@@ -2,16 +2,19 @@
 Claim verification (v0, from ai_agent.ipynb via pipeline_v0.ipynb): open web search, evidence
 passages from the result pages, then the NLI model scores each passage against the claim.
 
-Missing or weak evidence gives "uncertain", never a guessed verdict.
+Retrieval failure gives "retrieval_failed"; only usable but inconclusive evidence gives
+"uncertain". The pipeline displays retrieval failures as "Not checked".
 """
 
 import re
 import threading
 import time
+from urllib.parse import unquote
 
 import torch
 from ddgs import DDGS
 from trafilatura import extract, fetch_url
+from trafilatura.settings import use_config
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from services.extraction import is_checkable
@@ -21,12 +24,28 @@ MAX_RESULTS = 3
 MAX_PASSAGES = 5
 EVIDENCE_STRENGTH_THRESHOLD = 0.60
 CONFLICT_MARGIN = 0.10
-MODEL_VERSION = f"{NLI_MODEL_NAME}+rules-v0"   # stored with each verdict, to tell cached verdicts apart later
+MODEL_VERSION = f"{NLI_MODEL_NAME}+rules-v0.3"   # bump when evidence/verdict rules change
+SEARCH_PROVIDERS = ("wikipedia", "duckduckgo", "brave")
+SOURCE_POLICIES = {
+    "wikipedia_first": SEARCH_PROVIDERS,
+    "wikipedia_only": ("wikipedia",),
+}
+PAGE_DOWNLOAD_CONFIG = use_config()
+PAGE_DOWNLOAD_CONFIG.set("DEFAULT", "DOWNLOAD_TIMEOUT", "8")
 
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for",
     "from", "has", "have", "in", "is", "it", "of", "on",
     "that", "the", "to", "was", "were", "with"
+}
+ENTERTAINMENT_SOURCE_MARKERS = {
+    "song", "film", "movie", "album", "novel", "tv series", "television series"
+}
+ENTERTAINMENT_CLAIM_MARKERS = ENTERTAINMENT_SOURCE_MARKERS | {
+    "released", "directed", "director", "actor", "actress", "stars", "starring",
+    "singer", "band", "recorded", "performed", "written by", "premiered", "produced",
+    "screenplay", "sequel", "soundtrack", "episode", "season", "runtime", "box office",
+    "academy award", "oscar", "best picture", "music chart", "charts"
 }
 
 
@@ -51,7 +70,7 @@ class Verifier:
                 scores = self.model(**inputs).logits.softmax(dim=-1)[0].tolist()
         return {self.model.config.id2label[i].lower(): score for i, score in enumerate(scores)}
 
-    def check_claim(self, text):
+    def check_claim(self, text, source_policy="wikipedia_first"):
         text = re.sub(r"\b(\w+)(?:\s+\1\b)+", r"\1", text.strip(), flags=re.IGNORECASE)
         started = time.perf_counter()
         result = {"claim": text, "verdict": "not_checkable", "evidence": [],
@@ -64,7 +83,8 @@ class Verifier:
             result["verdict"] = "uncertain"
             stage = time.perf_counter()
             try:
-                hits = search_web(text)
+                hits, search_notes = search_web(text, source_policy)
+                result["errors"].extend(search_notes)
             except Exception as error:
                 hits = []
                 result["errors"].append(f"Search failed: {error}")
@@ -75,8 +95,11 @@ class Verifier:
             result["errors"].extend(errors)
             timings["retrieval"] = (time.perf_counter() - stage) * 1000
 
+            # Search snippets help locate a page, but they are often titles, table rows or
+            # truncated text. A verdict must be backed by prose extracted from a page.
+            page_passages = [p for p in passages if p["source_type"] == "page"]
             stage = time.perf_counter()
-            for passage in passages:
+            for passage in page_passages:
                 passage["scores"] = self.nli(passage["text"], text)
                 passage["support_strength"] = round(
                     passage["scores"]["entailment"] * passage["relevance"], 4
@@ -84,9 +107,9 @@ class Verifier:
                 passage["contradiction_strength"] = round(
                     passage["scores"]["contradiction"] * passage["relevance"], 4
                 )
-            if passages:
-                support = max(passages, key=lambda p: p["support_strength"])
-                against = max(passages, key=lambda p: p["contradiction_strength"])
+            if page_passages:
+                support = max(page_passages, key=lambda p: p["support_strength"])
+                against = max(page_passages, key=lambda p: p["contradiction_strength"])
                 support_score = support["support_strength"]
                 contradiction_score = against["contradiction_strength"]
                 supported = support_score >= EVIDENCE_STRENGTH_THRESHOLD
@@ -99,7 +122,9 @@ class Verifier:
                 elif contradicted:
                     result.update(verdict="contradicted", evidence=[against])
                 else:
-                    result["evidence"] = passages
+                    result["evidence"] = page_passages
+            else:
+                result["verdict"] = "retrieval_failed"
             timings["verification"] = (time.perf_counter() - stage) * 1000
 
         timings["total"] = (time.perf_counter() - started) * 1000
@@ -111,8 +136,57 @@ def content_words(text):
     return set(re.findall(r"\w+", text.lower())) - STOPWORDS
 
 
-def search_web(claim):
-    return list(DDGS(timeout=10).text(claim, max_results=MAX_RESULTS))
+def search_web(claim, source_policy="wikipedia_first"):
+    """Search providers in a fixed order and return diverse, de-duplicated results.
+
+    One result is taken from each provider before a second result is considered. This stops
+    the first provider from silently consuming the whole result budget and makes runs easier
+    to explain. ``wikipedia_only`` is available for a controlled source-limited experiment.
+    """
+    words = re.findall(r"\w+", claim.lower())
+    simplified = " ".join(word for word in words if word not in STOPWORDS)
+    queries = [claim]
+    if simplified and simplified.lower() != claim.lower():
+        queries.append(simplified)
+
+    providers = SOURCE_POLICIES.get(source_policy)
+    if providers is None:
+        raise ValueError(f"Unknown source policy: {source_policy}")
+
+    hits_by_provider = {provider: [] for provider in providers}
+    notes = []
+    for query in queries:
+        for provider in providers:
+            try:
+                found = list(DDGS(timeout=10).text(query, backend=provider, max_results=2) or [])
+                hits_by_provider[provider].extend(found)
+            except Exception as error:
+                notes.append(f"{provider} search failed for {query!r}: {error}")
+        if any(hits_by_provider.values()):
+            break
+
+    hits = []
+    seen_urls = set()
+    for result_index in range(2):
+        for provider in providers:
+            provider_hits = hits_by_provider[provider]
+            if result_index >= len(provider_hits):
+                continue
+            result = provider_hits[result_index]
+            url = result.get("href") or result.get("url")
+            key = (url or repr(sorted(result.items()))).lower()
+            if key in seen_urls:
+                continue
+            seen_urls.add(key)
+            hits.append({**result, "search_provider": provider})
+            if len(hits) == MAX_RESULTS:
+                return hits, notes
+
+    if hits:
+        return hits, notes
+    if not notes:
+        notes.append("All configured search providers returned no results.")
+    raise RuntimeError("; ".join(notes))
 
 
 def collect_evidence(claim, search_results):
@@ -121,10 +195,16 @@ def collect_evidence(claim, search_results):
     errors = []
     seen = set()
 
+    rejected = 0
+
     def add_passage(text, url, source_type):
-        passage = re.sub(r"\s+", " ", text).strip()[:700]
+        nonlocal rejected
+        passage = clean_passage_text(text)[:700]
         key = passage.lower()
         if not passage or key in seen:
+            return
+        if not is_prose_passage(passage):
+            rejected += 1
             return
         overlap = len(claim_words & content_words(passage))
         relevance = overlap / max(len(claim_words), 1)
@@ -139,11 +219,14 @@ def collect_evidence(claim, search_results):
         url = result.get("href") or result.get("url")
         if not url:
             continue
+        if not source_context_matches(claim, result):
+            errors.append(f"Skipped title-matched entertainment source without matching claim context: {url}")
+            continue
         snippet = result.get("body") or result.get("snippet") or ""
         if snippet:
             add_passage(snippet, url, "search_snippet")
         try:
-            html = fetch_url(url)
+            html = fetch_url(url, config=PAGE_DOWNLOAD_CONFIG)
             text = extract(html, include_comments=False) if html else None
         except Exception as error:
             errors.append(f"{url}: {error}")
@@ -158,7 +241,62 @@ def collect_evidence(claim, search_results):
         key=lambda passage: (passage["relevance"], passage["source_type"] == "page"),
         reverse=True,
     )
+    if rejected:
+        errors.append(f"Filtered {rejected} title, table or non-prose evidence passage(s).")
     return passages[:MAX_PASSAGES], errors
+
+
+def is_prose_passage(text):
+    """Reject title/table noise without excluding facts *about* songs or films.
+
+    A sentence such as 'Love Blind is a song by Jamiroquai' is prose and remains eligible.
+    A search row such as '| Love Blind | 3:35 | 7 |' is not evidence of that relationship.
+    """
+    if text.count("|") >= 2 or "\t" in text:
+        return False
+    words = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ][\w'’-]*", text)
+    if len(words) < 6:
+        return False
+    separators = len(re.findall(r"[|•·]", text))
+    return separators <= max(1, len(words) // 8)
+
+
+def source_context_matches(claim, search_result):
+    """Avoid title collisions while retaining genuine film/song claims.
+
+    Search can map the aphorism ``Love is blind`` to a song with the same title. We reject
+    that page unless the claim itself signals an entertainment work or relation. This is a
+    conservative V0/V1 heuristic; V2 can provide an explicit entity type.
+    """
+    url = unquote(search_result.get("href") or search_result.get("url") or "")
+    descriptor = f"{search_result.get('title', '')} {url}".replace("_", " ").lower()
+    claim_lower = claim.lower()
+    entertainment_source = any(marker in descriptor for marker in ENTERTAINMENT_SOURCE_MARKERS)
+    entertainment_claim = any(marker in claim_lower for marker in ENTERTAINMENT_CLAIM_MARKERS)
+    return not entertainment_source or entertainment_claim
+
+
+def clean_passage_text(text, max_prefix_words=8):
+    """Normalize evidence and remove a duplicated title at the start of a search snippet.
+
+    Search results sometimes begin with text such as ``Flat Earth Flat Earth is ...``.
+    That repeated claim-like title can dominate a small NLI model and reverse its verdict.
+    """
+    words = re.sub(r"\s+", " ", text).strip().split()
+
+    def normalized(part):
+        return [re.sub(r"\W+", "", word).lower() for word in part]
+
+    while len(words) >= 2:
+        repeated = False
+        for width in range(min(max_prefix_words, len(words) // 2), 0, -1):
+            if normalized(words[:width]) == normalized(words[width:2 * width]):
+                words = words[width:]
+                repeated = True
+                break
+        if not repeated:
+            break
+    return " ".join(words)
 
 
 def passage_stance(passage):

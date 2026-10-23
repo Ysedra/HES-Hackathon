@@ -7,6 +7,7 @@ A dependency-free local UI for the hackathon. It does not run models, caches or 
 The backend in `webapp/backend/` serves these files and the API on the same origin. From the repository root:
 
 ```bash
+uv sync
 uv run fastapi dev webapp/backend/main.py
 ```
 
@@ -16,15 +17,15 @@ A plain static server (e.g. `python -m http.server`) still shows the interface a
 
 The connection status in the top bar polls `GET /api/health` every 5 seconds, on window focus, and after a failed run. The backend answers `{"status": "ok", "versions": [...]}` once its models are loaded; the status is green when the selected version is listed, amber when it is not, and grey when the backend does not answer.
 
-## Planned versions
+## Versions
 
 | ID | Caches | AI stages | Processing |
 | --- | --- | --- | --- |
 | `baseline` | None | Verification; rule-based extraction | Sequential |
 | `claim-cache` | Verified claims | Verification; rule-based extraction | Sequential |
 | `two-ai` | Verified claims | Model-based extraction + verification | Sequential |
-| `two-caches` | Verified claims + evidence | Model-based extraction + verification | Sequential |
-| `parallel` | Verified claims + evidence | Model-based extraction + verification | Bounded parallel |
+| `two-caches` | Verified claims + evidence | Model-based extraction + verification; Wikipedia-only retrieval | Sequential |
+| `parallel` | Verified claims (prototype) | Current rule extraction + verification | Three workers |
 
 These are provisional definitions. Change `VERSIONS` in `app.js` if the team chooses a different role for the second AI stage or first cache. A version selection passes configuration to the backend; it does **not** implement the optimisation. Unsupported configurations must be rejected by the backend (for example HTTP 422), not silently run as the baseline.
 
@@ -42,7 +43,7 @@ Use localhost or HTTPS for microphone permission. No real microphone recording o
 
 ## Local HTTP adapter
 
-There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (v0) only. Both are documented, and can be tried, at <http://localhost:8000/docs>.
+There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (V0), `claim-cache` (V1), and the `parallel` V4 prototype. Both routes are documented, and can be tried, at <http://localhost:8000/docs>.
 
 `POST /api/analyse/text` takes JSON:
 
@@ -54,7 +55,8 @@ There is one route per input type, implemented in `webapp/backend/main.py` with 
     "caches": ["claims", "evidence"],
     "extraction": "model",
     "ai_count": 2,
-    "parallel": false
+    "parallel": false,
+    "source_policy": "wikipedia_first"
   },
   "text": "Paris is in France and Berlin is in Germany."
 }
@@ -107,7 +109,7 @@ Numbers above illustrate the contract; they are not benchmark results. Use `null
 
 An NLI model does not generate a reasoning trace. Supply a short evidence-based assessment, e.g. which passage supports/contradicts the claim and why an uncertain result was returned.
 
-The frontend supports `not_checked`, `not_checkable`, `checking`, `supported`, `contradicted`, and `uncertain`. The current database does not have a `not_checkable` claim status: either keep those as segments with `extraction_complete: true` and no claims, or agree a schema change. Do not insert that value into the existing CHECK constraint.
+The frontend supports `not_checked`, `not_checkable`, `checking`, `supported`, `contradicted`, and `uncertain`. Retrieval failures are returned to the UI as `not_checked`; `uncertain` means readable page evidence was scored but remained weak or conflicting. The database does not store `not_checkable` or `retrieval_failed` in the claim-status column.
 
 ## Transcript segments are not claims
 
@@ -160,12 +162,11 @@ For SSE, `window.veriflow.connect("/events")` adds the current IDs as query para
 
 The UI records completed real runs separately by version and can export their inputs, claims, configuration and backend metrics as JSON. Exports therefore contain what the professor said: treat them as local test data, not telemetry to upload automatically. Demo fixtures are excluded.
 
-Connected (`baseline` only): the HTTP adapter, the health check, and the v0 pipeline for text, uploads and recordings, with rule-based sentence claims, web evidence, NLI scores and per-claim timings.
+Connected (`baseline`, `claim-cache`, and the `parallel` prototype): the HTTP adapter, health check, text/uploads/recordings, rule-based sentence claims, deterministic Wikipedia-first retrieval, page-only verdict evidence, NLI scores, explanations, timings, V1 cold/warm cache measurements, run-wide duplicate suppression, and three-worker verification.
 
 Still to connect:
 1. Model-based atomic-claim extraction (v0 treats each checkable sentence as one claim).
 2. Live loopback/microphone transcription (SSE or a streamed endpoint); recordings and files already stream their results.
-3. The other version configurations and cache policies.
-4. Real provenance, assessments, scores and benchmark measurements.
+3. The V2+ version configurations and the evidence-cache policy.
 
 The frontend itself has no dependencies; the backend's are in the root `pyproject.toml`.

@@ -84,8 +84,10 @@ QUESTION_STARTS = {
 }
 OPINION_MARKERS = {
     "i think", "i believe", "i feel", "in my opinion", "i prefer",
-    "best", "worst", "beautiful", "ugly", "delicious", "boring", "amazing", "favorite"
+    "best", "worst", "better than", "worse than", "superior to", "inferior to",
+    "beautiful", "ugly", "delicious", "boring", "amazing", "favorite"
 }
+META_TEXT = re.compile(r"\b(?:is|are)\s+(?:a|an|the)?\s*(?:statement|sentence|phrase|word|claim)\b")
 COMMAND_STARTS = {
     "please", "tell", "give", "show", "explain", "close", "open",
     "stop", "go", "make", "write", "run", "click", "select"
@@ -104,5 +106,7 @@ def is_checkable(text):
     if first_word in COMMAND_STARTS:
         return False
     if any(marker in clean.lower() for marker in OPINION_MARKERS):
+        return False
+    if META_TEXT.search(clean.lower()):
         return False
     return True
