@@ -12,7 +12,7 @@ const $ = id => document.getElementById(id);
 const state = {
   version: "baseline", runs: new Map(), history: [], timers: [], busy: false,
   controller: null, eventSource: null, recorder: null, stream: null,
-  requestingMic: false, micTimer: null, media: null, mediaUrl: null
+  requestingMic: false, micTimer: null, media: null, mediaUrl: null, backend: null
 };
 const version = () => VERSIONS.find(item => item.id === state.version);
 const activeRun = () => state.runs.get(state.version);
@@ -76,7 +76,26 @@ function selectVersion(id) {
   state.version = id;
   if (!activeRun()) beginRun();
   else render();
+  renderConnection();
   return true;
+}
+// Poll GET /api/health: the backend answers only once its models are loaded, and lists the versions it implements.
+async function checkBackend() {
+  let health = null;
+  try {
+    const response = await fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(3000) });
+    if (response.ok && response.headers.get("content-type")?.includes("application/json")) health = await response.json();
+  } catch {}
+  state.backend = health;
+  renderConnection();
+}
+function renderConnection() {
+  const status = $("connectionStatus");
+  const available = Array.isArray(state.backend?.versions) && state.backend.versions.includes(state.version);
+  status.textContent = !state.backend ? "Backend not connected"
+    : available ? `Backend connected · ${version().label}` : `Backend connected · ${version().label} not implemented`;
+  status.classList.toggle("connected", !!state.backend && available);
+  status.classList.toggle("partial", !!state.backend && !available);
 }
 function renderTranscript() {
   const run = activeRun();
@@ -228,47 +247,56 @@ async function analyse(input) {
   state.busy = true;
   const controller = new AbortController();
   state.controller = controller;
-  let timedOut = false;
-  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 120000);
+  // Time out when the pipeline stops making progress, not after a fixed total: long recordings are fine.
+  let timedOut = false, timeout;
+  const resetTimeout = () => { clearTimeout(timeout); timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 120000); };
+  resetTimeout();
   setRunNotice(run, input.text ? "Sending text for claim extraction and verification…" : "Sending audio/video to local transcription and verification…");
   render();
   try {
-    let body, headers = {};
+    let url, body, headers = {};
     const metadata = { run_id: run.id, version_id: run.version_id, config: run.config };
     if (input.text) {
+      url = "/api/analyse/text";
       body = JSON.stringify({ ...metadata, text: input.text });
       headers["Content-Type"] = "application/json";
     } else {
+      url = "/api/analyse/media";
       body = new FormData();
       body.append("media", input.media, input.filename || "microphone.webm");
       body.append("metadata", JSON.stringify(metadata));
     }
-    const response = await fetch("/api/analyse", { method: "POST", headers, body, signal: controller.signal });
+    const response = await fetch(url, { method: "POST", headers, body, signal: controller.signal });
     if (!response.ok) {
-      if ([404, 405, 501].includes(response.status)) throw new Error("The local /api/analyse backend is not connected yet. Input capture works, but live transcription and verdicts need the Python adapter. Your recording is available to save or retry.");
+      if ([404, 405, 501].includes(response.status)) throw new Error(`The local ${url} backend is not connected yet. Input capture works, but live transcription and verdicts need the Python adapter. Your recording is available to save or retry.`);
       throw new Error(`Backend returned HTTP ${response.status}. No verdicts were fabricated.`);
     }
-    if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("Expected a JSON pipeline response, not a static page.");
-    const result = await response.json();
-    if (result.run_id !== run.id || result.version_id !== run.version_id) throw new Error("Backend response belongs to a different run or version.");
-    if (!Array.isArray(result.segments) || !Array.isArray(result.claims)) throw new Error("Backend response must contain segments[] and claims[].");
-    for (const segment of result.segments) {
-      if (!applyEvent({ ...metadata, type: "transcript.segment", data: segment })) throw new Error("Invalid transcript segment from backend.");
+    if (!response.headers.get("content-type")?.includes("application/x-ndjson")) throw new Error("Expected a streamed pipeline response, not a static page.");
+    setRunNotice(run, input.text ? "Checking claims… results appear as each one is verified." : "Transcribing and checking claims… results appear as each one is verified.");
+    // One JSON event per line, applied as soon as it arrives
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "", complete = false;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      resetTimeout();
+      buffer += value;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines.filter(line => line.trim())) {
+        const event = JSON.parse(line);
+        if (event.type === "run.error") throw new Error(`The pipeline failed: ${event.data?.message || "unknown error"}. Results so far are kept.`);
+        if (!applyEvent(event)) throw new Error("Invalid pipeline event from backend.");
+        if (event.type === "run.complete") complete = true;
+      }
     }
-    for (const claim of result.claims) {
-      if (!applyEvent({ ...metadata, type: "claim.update", data: claim })) throw new Error("Invalid claim from backend.");
-    }
-    if (result.metrics) applyEvent({ ...metadata, type: "metrics.update", data: result.metrics });
-    applyEvent({ ...metadata, type: "run.complete" });
-    $("connectionStatus").textContent = "Local backend responded";
-    $("connectionStatus").classList.add("connected");
+    if (!complete) throw new Error("The pipeline stream ended before the run completed. Results so far are kept.");
   } catch (error) {
     if (error.name === "AbortError" && !timedOut) return;
-    const message = timedOut ? "The local pipeline timed out after 120 seconds. Retry when the models are ready." : error.message;
+    const message = timedOut ? "The local pipeline made no progress for 120 seconds. Results so far are kept." : error.message;
     if (activeRun() === run) {
       setRunNotice(run, message || "Could not reach the local backend.", "error");
-      $("connectionStatus").textContent = "Backend unavailable or run failed";
-      $("connectionStatus").classList.remove("connected");
+      checkBackend();   // a failed run may mean the backend went away
     }
   } finally {
     clearTimeout(timeout);
@@ -438,3 +466,6 @@ window.veriflow = {
   context: () => { const run = activeRun(); return { run_id: run.id, version_id: run.version_id, config: structuredClone(run.config) }; }
 };
 beginRun();
+checkBackend();
+setInterval(checkBackend, 5000);
+window.addEventListener("focus", checkBackend);
