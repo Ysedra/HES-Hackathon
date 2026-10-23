@@ -30,10 +30,3 @@ dependencies = [
 dev = [
     "ipykernel>=7.4.0",
 ]
-
-[project.scripts]
-hes-hackathon = "hes_hackathon:main"
-
-[build-system]
-requires = ["uv_build>=0.12.19,<0.13.0"]
-build-backend = "uv_build"
