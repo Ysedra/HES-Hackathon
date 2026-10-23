@@ -666,7 +666,7 @@ wheels = [
 [[package]]
 name = "hes-hackathon"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "av" },
     { name = "datasets" },
