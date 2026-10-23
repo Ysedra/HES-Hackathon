@@ -1,5 +1,7 @@
 """
-- Capture the audio that is sent to the default speaker (WASAPI loopback). Works on Windows only.
+- Capture the audio that is sent to the default speaker (WASAPI loopback). Tested on Windows.
+macOS (not tested yet): BlackHole must be installed, a Multi-Output Device (speaker + BlackHole) must be the output
+in "Audio MIDI Setup", and the app that runs the script (Terminal, VS Code) needs microphone permission.
 The audio is taken with WASAPI loopback while it is still PCM (digital samples), before it reaches the speaker. These PCM values will then be given to the ASR model.
 
 The mixer works in the mix format of the device (GetMixFormat): float32 samples, with the sample rate of the device (usually 48000 or 44100 Hz, it depends on the hardware and driver).
@@ -33,7 +35,10 @@ CHUNK_SECONDS = 0.5
 
 # Find the speaker that plays the sound now and open its loopback.
 # Loopback is like a microphone, but it records the sound that goes to the speaker.
+# macOS has no loopback, so we read the BlackHole virtual device like a normal microphone.
 def get_loopback():
+    if sys.platform == "darwin":  # macOS
+        return sc.get_microphone(id="BlackHole")
     speaker = sc.default_speaker()
     return sc.get_microphone(id=speaker.name, include_loopback=True)
 
