@@ -33,14 +33,35 @@ from urllib.parse import urlparse
 
 from schemas import ClaimOut, EvidenceOut, SegmentOut
 from services import extraction, storage, transcription
-from services.verification import EVIDENCE_STRENGTH_THRESHOLD, MODEL_VERSION, Verifier, passage_stance
+from services.verification import (EVIDENCE_STRENGTH_THRESHOLD, MODEL_VERSION, Verifier, content_words,
+                                   passage_stance)
 from versions import Version
 
 log = logging.getLogger("pipeline")
 CACHE_MODEL_VERSION = f"v1-exact:web-r2:{MODEL_VERSION}"
+EVIDENCE_CACHE_VERSION = f"v3-fts:web-r2:{MODEL_VERSION}"
 
 Event = tuple[str, dict]
 Run = Generator[Event, None, None]
+
+
+class EvidenceCache:
+    """V3's evidence cache (storage.py), in the shape the verifier's evidence_cache hook expects.
+    Each call opens its own connection, so one instance can be used from any thread."""
+
+    def candidates(self, claim):
+        con = storage.connect(storage.EVIDENCE_DB_PATH)
+        try:
+            return storage.lookup_cached_evidence(con, sorted(content_words(claim)), EVIDENCE_CACHE_VERSION)
+        finally:
+            con.close()
+
+    def save_page(self, url, sentences):
+        con = storage.connect(storage.EVIDENCE_DB_PATH)
+        try:
+            storage.save_cached_page(con, url, sentences, EVIDENCE_CACHE_VERSION)
+        finally:
+            con.close()
 
 
 class Pipeline:
@@ -54,6 +75,7 @@ class Pipeline:
         self.verifier = Verifier()
         storage.init_db()
         storage.init_claim_cache()
+        storage.init_evidence_cache()
 
     def run_media(self, version: Version, run_id: str, media: BinaryIO, name: str) -> Run:
         segments = (transcription.transcribe_file_isolated(media, name)
@@ -128,6 +150,7 @@ class Pipeline:
         """V0/V1: each claim is checked as soon as it is complete, before the next segment.
         Returns the number of segments."""
         cache_con = storage.connect(storage.CACHE_DB_PATH) if "claims" in version.caches else None
+        evidence_cache = EvidenceCache() if "evidence" in version.caches else None
         n_segments = 0
         try:
             for type_, data in self._claims(con, source_id, segments):
@@ -137,10 +160,12 @@ class Pipeline:
                     continue
                 claim_id, claim, sentence, stable_at = data
                 yield "claim.update", claim.model_dump()   # shown as "Checking" while the search runs
-                self._check(con, cache_con, claim_id, claim, sentence, stable_at, version.source_policy)
+                self._check(con, cache_con, claim_id, claim, sentence, stable_at, version.source_policy,
+                            evidence_cache)
                 claims.append(claim)
                 yield "claim.update", claim.model_dump()
-                yield "metrics.update", latency_metrics(claims, cache_con is not None)
+                yield "metrics.update", latency_metrics(claims, cache_con is not None,
+                                                        evidence_enabled=evidence_cache is not None)
         finally:
             if cache_con is not None:
                 cache_con.close()
@@ -229,11 +254,12 @@ class Pipeline:
                 cache_con.close()
 
     def _check(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at,
-               source_policy="wikipedia_first"):
+               source_policy="wikipedia_first", evidence_cache=None):
         """Check one sentence in this thread: the claim cache first, then a fresh check on a miss."""
         done, lookup_ms = self._check_cached(con, cache_con, claim_id, claim, sentence, stable_at)
         if not done:
-            self._check_fresh(con, cache_con, claim_id, claim, sentence, stable_at, source_policy, lookup_ms)
+            self._check_fresh(con, cache_con, claim_id, claim, sentence, stable_at, source_policy, lookup_ms,
+                              evidence_cache)
 
     def _check_cached(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at):
         """Answer from the claim cache if it holds this sentence: store the result and fill in claim.
@@ -263,12 +289,13 @@ class Pipeline:
         return True, lookup_ms
 
     def _check_fresh(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at,
-                     source_policy="wikipedia_first", lookup_ms=0.0):
-        """Search the web and run NLI, store the result (and cache it) and fill in claim.
-        A failed check doesn't stop the run."""
+                     source_policy="wikipedia_first", lookup_ms=0.0, evidence_cache=None):
+        """Verify with the evidence cache (V3) or the web and NLI, store the result (and cache it)
+        and fill in claim. A failed check doesn't stop the run."""
         started = time.perf_counter()
         try:
-            result = self.verifier.check_claim(sentence.text, source_policy)
+            result = self.verifier.check_claim(sentence.text, source_policy, evidence_cache)
+            path = result.get("retrieval", "fresh")   # "evidence_cache" when cached evidence decided it
             result["explanation"] = explain(result)
             if cache_con is not None:
                 result["timings_ms"]["cache_lookup"] = round(lookup_ms, 2)
@@ -287,12 +314,12 @@ class Pipeline:
                     lookup_ms + (time.perf_counter() - started) * 1000, 2
                 )
             verdict_at = storage.save_result(
-                con, claim_id, result, MODEL_VERSION, passage_stance, path="fresh"
+                con, claim_id, result, MODEL_VERSION, passage_stance, path=path
             )
         except Exception as error:
             self._fail(con, claim_id, claim, sentence, error)
             return
-        self._fill(claim_id, claim, sentence, result, "fresh", verdict_at - stable_at)
+        self._fill(claim_id, claim, sentence, result, path, verdict_at - stable_at)
 
     def _fail(self, con, claim_id, claim: ClaimOut, sentence, error):
         log.exception("claim %d failed: %s", claim_id, sentence.text)
@@ -367,7 +394,7 @@ def confidence(result):
                for p in result["evidence"])
 
 
-def latency_metrics(claims, cache_enabled=False, queue_size=0):
+def latency_metrics(claims, cache_enabled=False, queue_size=0, evidence_enabled=False):
     """p50/p95 over the claims that got a verdict so far (not over skipped sentences)."""
     latencies = sorted(c.latency_ms for c in claims if c.latency_ms is not None)
     metrics = {"queue_size": queue_size}
@@ -378,4 +405,6 @@ def latency_metrics(claims, cache_enabled=False, queue_size=0):
         hits = sum(claim.path == "claims_cache" for claim in claims)
         metrics.update(cache_hits=hits, cache_misses=len(claims) - hits,
                        cache_hit_rate=100 * hits / len(claims))
+    if evidence_enabled and claims:
+        metrics.update(evidence_hits=sum(claim.path == "evidence_cache" for claim in claims))
     return metrics

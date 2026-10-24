@@ -3,7 +3,7 @@ const VERSIONS = [
   { id: "baseline", stage: "BASELINE", label: "Baseline", spec: "0 caches · 1 AI · sequential", description: "Fresh, deterministic Wikipedia-first retrieval and verification for every claim.", config: { caches: [], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
   { id: "claim-cache", stage: "IMPLEMENTED", label: "Claim cache", spec: "1 cache · 1 AI · sequential", description: "Reuse only page-backed verdicts; failed and uncertain checks are never cached.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
   { id: "two-ai", stage: "PLANNED", label: "Two AI stages", spec: "1 cache · 2 AI · sequential", description: "Model-based claim extraction plus verification, with Wikipedia-first retrieval and web fallbacks.", config: { caches: ["claims"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_first" } },
-  { id: "two-caches", stage: "PLANNED", label: "Two cache layers", spec: "2 caches · 2 AI · Wikipedia only", description: "Add a page-evidence cache and deliberately limit retrieval to Wikipedia for a controlled source experiment.", config: { caches: ["claims", "evidence"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_only" } },
+  { id: "two-caches", stage: "IMPLEMENTED", label: "Two cache layers", spec: "2 caches · 1 AI · sequential", description: "V1 plus an evidence cache: sentences from pages already downloaded are searched first, so claims on a known topic skip web search. Used only when it gives a clear verdict.", config: { caches: ["claims", "evidence"], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
   { id: "parallel", stage: "PROTOTYPE", label: "Parallel pipeline", spec: "Current V1 · adjustable workers", description: "Runs the current V1 components concurrently to isolate the speedup. V2 and V3 will be added to this V4 target later.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: true, source_policy: "wikipedia_first" } }
 ];
 const STATUS = { not_checked: "Not checked", not_checkable: "Not checkable", checking: "Checking", supported: "Supported", contradicted: "Contradicted", uncertain: "Uncertain" };
@@ -172,7 +172,8 @@ function renderInspector() {
     ${claim.errors?.length ? '<section class="inspector-section"><h3>Retrieval notes</h3><p>' + claim.errors.map(esc).join("<br>") + "</p></section>" : ""}`;
 }
 function metricCache(metrics) {
-  return finite(metrics.cache_hit_rate) && metrics.cache_hit_rate >= 0 && metrics.cache_hit_rate <= 100 ? Math.round(metrics.cache_hit_rate) + "%" : "—";
+  const rate = finite(metrics.cache_hit_rate) && metrics.cache_hit_rate >= 0 && metrics.cache_hit_rate <= 100 ? Math.round(metrics.cache_hit_rate) + "%" : "—";
+  return finite(metrics.evidence_hits) ? `${rate} · ${metrics.evidence_hits} evidence` : rate;
 }
 function renderMetrics() {
   const run = activeRun();
@@ -437,17 +438,19 @@ function connect(url = "/events") {
   source.onerror = () => { $("connectionStatus").textContent = "Event stream reconnecting…"; $("connectionStatus").classList.remove("connected"); };
   return source;
 }
-async function clearClaimCache() {
+async function clearCaches() {
   if (state.busy || !state.backend) return;
-  if (!window.confirm("Clear the V1 verified-claim cache? Transcript runs and the main database will not be changed.")) return;
+  if (!window.confirm("Clear the V1 claim cache and the V3 evidence cache? Transcript runs and the main database will not be changed.")) return;
   $("clearCacheButton").disabled = true;
   try {
-    const response = await fetch("/api/cache/claims/clear", { method: "POST" });
-    if (!response.ok) throw new Error(`Backend returned HTTP ${response.status}.`);
-    const result = await response.json();
-    setRunNotice(activeRun(), `V1 claim cache cleared (${result.cleared ?? 0} entries). Your run history was kept.`);
+    const [claims, evidence] = await Promise.all(["claims", "evidence"].map(async cache => {
+      const response = await fetch(`/api/cache/${cache}/clear`, { method: "POST" });
+      if (!response.ok) throw new Error(`Backend returned HTTP ${response.status}.`);
+      return response.json();
+    }));
+    setRunNotice(activeRun(), `Caches cleared (${claims.cleared ?? 0} claims, ${evidence.cleared ?? 0} evidence pages). Your run history was kept.`);
   } catch (error) {
-    setRunNotice(activeRun(), `Could not clear the V1 cache: ${error.message}`, "error");
+    setRunNotice(activeRun(), `Could not clear the caches: ${error.message}`, "error");
   } finally {
     render();
   }
@@ -461,7 +464,7 @@ $("textForm").addEventListener("submit", event => {
 $("micButton").addEventListener("click", toggleMic);
 $("demoButton").addEventListener("click", demo);
 $("clearButton").addEventListener("click", () => beginRun());
-$("clearCacheButton").addEventListener("click", clearClaimCache);
+$("clearCacheButton").addEventListener("click", clearCaches);
 $("claimsOnly").addEventListener("change", renderTranscript);
 $("workersInput").addEventListener("input", event => { state.workers = Number(event.target.value); renderVersions(); });
 $("uploadButton").addEventListener("click", () => $("mediaInput").click());

@@ -24,7 +24,7 @@ The connection status in the top bar polls `GET /api/health` every 5 seconds, on
 | `baseline` | None | Verification; rule-based extraction | Sequential |
 | `claim-cache` | Verified claims | Verification; rule-based extraction | Sequential |
 | `two-ai` | Verified claims | Model-based extraction + verification | Sequential |
-| `two-caches` | Verified claims + evidence | Model-based extraction + verification; Wikipedia-only retrieval | Sequential |
+| `two-caches` | Verified claims + evidence (full-text index of downloaded page sentences) | Rule-based extraction + verification (model extraction once V2 exists) | Sequential |
 | `parallel` | Verified claims (prototype) | Current rule extraction + verification | 1–8 workers (GUI slider, default 3) |
 
 These are provisional definitions. Change `VERSIONS` in `app.js` if the team chooses a different role for the second AI stage or first cache. A version selection passes configuration to the backend; it does **not** implement the optimisation. Unsupported configurations must be rejected by the backend (for example HTTP 422), not silently run as the baseline.
@@ -43,7 +43,7 @@ Use localhost or HTTPS for microphone permission. No real microphone recording o
 
 ## Local HTTP adapter
 
-There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (V0), `claim-cache` (V1), and the `parallel` V4 prototype. Both routes are documented, and can be tried, at <http://localhost:8000/docs>.
+There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (V0), `claim-cache` (V1), `two-caches` (V3) and the `parallel` V4 prototype. Both routes are documented, and can be tried, at <http://localhost:8000/docs>.
 
 `POST /api/analyse/text` takes JSON:
 

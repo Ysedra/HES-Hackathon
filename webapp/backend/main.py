@@ -5,6 +5,7 @@ App setup and routes only: HTTP helpers are in api_helpers.py, the work happens 
 - GET  /api/health          ready check and implemented versions
 - POST /api/analyse/text    typed text (JSON)
 - POST /api/analyse/media   an uploaded file or microphone recording (multipart form)
+- POST /api/cache/claims/clear, /api/cache/evidence/clear   reset the V1 / V3 experiment caches
 
 Both analyse routes stream the run as NDJSON events (see pipeline.py).
 Try them at http://localhost:8000/docs
@@ -66,6 +67,14 @@ async def clear_claim_cache():
     """Reset only the separate V1 experiment cache; run history stays untouched."""
     cleared = storage.clear_claim_cache()
     log.info("cleared %d V1 claim-cache entries", cleared)
+    return {"cleared": cleared}
+
+
+@app.post("/api/cache/evidence/clear")
+async def clear_evidence_cache():
+    """Reset only the separate V3 evidence cache; run history stays untouched."""
+    cleared = storage.clear_evidence_cache()
+    log.info("cleared %d cached evidence pages", cleared)
     return {"cleared": cleared}
 
 

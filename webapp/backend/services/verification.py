@@ -22,6 +22,7 @@ from services.extraction import is_checkable
 NLI_MODEL_NAME = "cross-encoder/nli-MiniLM2-L6-H768"
 MAX_RESULTS = 3
 MAX_PASSAGES = 5
+MIN_CACHED_PASSAGES = 2   # V3: fewer relevant cached passages than this is an evidence-cache miss
 EVIDENCE_STRENGTH_THRESHOLD = 0.60
 CONFLICT_MARGIN = 0.10
 MODEL_VERSION = f"{NLI_MODEL_NAME}+rules-v0.3"   # bump when evidence/verdict rules change
@@ -70,7 +71,10 @@ class Verifier:
                 scores = self.model(**inputs).logits.softmax(dim=-1)[0].tolist()
         return {self.model.config.id2label[i].lower(): score for i, score in enumerate(scores)}
 
-    def check_claim(self, text, source_policy="wikipedia_first"):
+    def check_claim(self, text, source_policy="wikipedia_first", evidence_cache=None):
+        """Verify one claim. evidence_cache (V3, optional) has candidates(claim) -> [(text, url)]
+        and save_page(url, sentences): cached page sentences are tried before searching, and
+        are used only when they give a clear verdict; downloaded pages are saved to it."""
         text = re.sub(r"\b(\w+)(?:\s+\1\b)+", r"\1", text.strip(), flags=re.IGNORECASE)
         started = time.perf_counter()
         result = {"claim": text, "verdict": "not_checkable", "evidence": [],
@@ -79,7 +83,9 @@ class Verifier:
         checkable = is_checkable(text)
         timings["checkability"] = (time.perf_counter() - started) * 1000
 
-        if checkable:
+        if checkable and evidence_cache is not None and self._check_cached_evidence(text, result, evidence_cache):
+            result["retrieval"] = "evidence_cache"
+        elif checkable:
             result["verdict"] = "uncertain"
             stage = time.perf_counter()
             try:
@@ -90,47 +96,80 @@ class Verifier:
                 result["errors"].append(f"Search failed: {error}")
             timings["search"] = (time.perf_counter() - stage) * 1000
 
+            def save_page(url, sentences):   # a failed cache write must not fail the check
+                saving = time.perf_counter()
+                try:
+                    evidence_cache.save_page(url, sentences)
+                except Exception as error:
+                    result["errors"].append(f"Evidence cache write failed: {error}")
+                timings["evidence_save"] = timings.get("evidence_save", 0.0) + (time.perf_counter() - saving) * 1000
+
             stage = time.perf_counter()
-            passages, errors = collect_evidence(text, hits)
+            passages, errors = collect_evidence(text, hits, save_page if evidence_cache is not None else None)
             result["errors"].extend(errors)
             timings["retrieval"] = (time.perf_counter() - stage) * 1000
 
             # Search snippets help locate a page, but they are often titles, table rows or
             # truncated text. A verdict must be backed by prose extracted from a page.
-            page_passages = [p for p in passages if p["source_type"] == "page"]
             stage = time.perf_counter()
-            for passage in page_passages:
-                passage["scores"] = self.nli(passage["text"], text)
-                passage["support_strength"] = round(
-                    passage["scores"]["entailment"] * passage["relevance"], 4
-                )
-                passage["contradiction_strength"] = round(
-                    passage["scores"]["contradiction"] * passage["relevance"], 4
-                )
-            if page_passages:
-                support = max(page_passages, key=lambda p: p["support_strength"])
-                against = max(page_passages, key=lambda p: p["contradiction_strength"])
-                support_score = support["support_strength"]
-                contradiction_score = against["contradiction_strength"]
-                supported = support_score >= EVIDENCE_STRENGTH_THRESHOLD
-                contradicted = contradiction_score >= EVIDENCE_STRENGTH_THRESHOLD
-                close_conflict = abs(support_score - contradiction_score) < CONFLICT_MARGIN
-                if supported and contradicted and close_conflict:
-                    result["evidence"] = [support, against]
-                elif supported and support_score > contradiction_score:
-                    result.update(verdict="supported", evidence=[support])
-                elif contradicted:
-                    result.update(verdict="contradicted", evidence=[against])
-                else:
-                    result["evidence"] = page_passages
-            else:
-                result["verdict"] = "retrieval_failed"
+            self._score(text, [p for p in passages if p["source_type"] == "page"], result)
             timings["verification"] = (time.perf_counter() - stage) * 1000
 
         timings["total"] = (time.perf_counter() - started) * 1000
         result["timings_ms"] = {name: round(ms, 2) for name, ms in timings.items()}
         return result
 
+    def _check_cached_evidence(self, text, result, evidence_cache):
+        """Try the evidence cache. True when its passages give a clear verdict (stored in result);
+        False on a miss or an unclear verdict, and the claim is then searched as usual."""
+        timings = result["timings_ms"]
+        stage = time.perf_counter()
+        try:
+            candidates = evidence_cache.candidates(text)
+        except Exception as error:
+            result["errors"].append(f"Evidence cache lookup failed: {error}")
+            candidates = []
+        passages, _ = rank_passages(text, [(passage, url, "page") for passage, url in candidates])
+        timings["evidence_lookup"] = (time.perf_counter() - stage) * 1000
+        if len(passages) < MIN_CACHED_PASSAGES:
+            return False
+        stage = time.perf_counter()
+        trial = {"verdict": "uncertain", "evidence": []}
+        self._score(text, passages, trial)
+        timings["cached_verification"] = (time.perf_counter() - stage) * 1000
+        if trial["verdict"] not in {"supported", "contradicted"}:
+            return False
+        result.update(verdict=trial["verdict"], evidence=trial["evidence"])
+        return True
+
+    def _score(self, text, page_passages, result):
+        """Score page passages with NLI and set result's verdict and evidence."""
+        for passage in page_passages:
+            passage["scores"] = self.nli(passage["text"], text)
+            passage["support_strength"] = round(
+                passage["scores"]["entailment"] * passage["relevance"], 4
+            )
+            passage["contradiction_strength"] = round(
+                passage["scores"]["contradiction"] * passage["relevance"], 4
+            )
+        if not page_passages:
+            result["verdict"] = "retrieval_failed"
+            return
+        support = max(page_passages, key=lambda p: p["support_strength"])
+        against = max(page_passages, key=lambda p: p["contradiction_strength"])
+        support_score = support["support_strength"]
+        contradiction_score = against["contradiction_strength"]
+        supported = support_score >= EVIDENCE_STRENGTH_THRESHOLD
+        contradicted = contradiction_score >= EVIDENCE_STRENGTH_THRESHOLD
+        close_conflict = abs(support_score - contradiction_score) < CONFLICT_MARGIN
+        if supported and contradicted and close_conflict:
+            result["evidence"] = [support, against]
+        elif supported and support_score > contradiction_score:
+            result.update(verdict="supported", evidence=[support])
+        elif contradicted:
+            result.update(verdict="contradicted", evidence=[against])
+        else:
+            result["evidence"] = page_passages
 
 def content_words(text):
     return set(re.findall(r"\w+", text.lower())) - STOPWORDS
@@ -189,23 +228,22 @@ def search_web(claim, source_policy="wikipedia_first"):
     raise RuntimeError("; ".join(notes))
 
 
-def collect_evidence(claim, search_results):
+def rank_passages(claim, candidates):
+    """Clean, filter and rank candidate passages, given as (text, url, source_type).
+    Keeps prose passages sharing at least half the claim's words, best first. Returns
+    (passages, rejected), rejected counting the title, table or non-prose candidates."""
     claim_words = content_words(claim)
     passages = []
-    errors = []
     seen = set()
-
     rejected = 0
-
-    def add_passage(text, url, source_type):
-        nonlocal rejected
+    for text, url, source_type in candidates:
         passage = clean_passage_text(text)[:700]
         key = passage.lower()
         if not passage or key in seen:
-            return
+            continue
         if not is_prose_passage(passage):
             rejected += 1
-            return
+            continue
         overlap = len(claim_words & content_words(passage))
         relevance = overlap / max(len(claim_words), 1)
         if relevance >= 0.5:
@@ -214,7 +252,18 @@ def collect_evidence(claim, search_results):
                 "text": passage, "url": url, "source_type": source_type,
                 "overlap": overlap, "relevance": round(relevance, 3),
             })
+    passages.sort(
+        key=lambda passage: (passage["relevance"], passage["source_type"] == "page"),
+        reverse=True,
+    )
+    return passages[:MAX_PASSAGES], rejected
 
+
+def collect_evidence(claim, search_results, on_page=None):
+    """Download the search results' pages and rank their passages. on_page(url, sentences),
+    if given, receives each downloaded page's prose sentences (for the V3 evidence cache)."""
+    candidates = []
+    errors = []
     for result in search_results:
         url = result.get("href") or result.get("url")
         if not url:
@@ -224,7 +273,7 @@ def collect_evidence(claim, search_results):
             continue
         snippet = result.get("body") or result.get("snippet") or ""
         if snippet:
-            add_passage(snippet, url, "search_snippet")
+            candidates.append((snippet, url, "search_snippet"))
         try:
             html = fetch_url(url, config=PAGE_DOWNLOAD_CONFIG)
             text = extract(html, include_comments=False) if html else None
@@ -235,16 +284,14 @@ def collect_evidence(claim, search_results):
             errors.append(f"{url}: no readable text")
             continue
         sentences = re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", text))
-        for sentence in sentences:
-            add_passage(sentence, url, "page")
-    passages.sort(
-        key=lambda passage: (passage["relevance"], passage["source_type"] == "page"),
-        reverse=True,
-    )
+        candidates.extend((sentence, url, "page") for sentence in sentences)
+        if on_page is not None:
+            prose = (clean_passage_text(sentence)[:700] for sentence in sentences)
+            on_page(url, [passage for passage in prose if passage and is_prose_passage(passage)])
+    passages, rejected = rank_passages(claim, candidates)
     if rejected:
         errors.append(f"Filtered {rejected} title, table or non-prose evidence passage(s).")
-    return passages[:MAX_PASSAGES], errors
-
+    return passages, errors
 
 def is_prose_passage(text):
     """Reject title/table noise without excluding facts *about* songs or films.

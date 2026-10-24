@@ -2,8 +2,9 @@
 Pipeline versions: which steps each version enables. The backend owns this list; the frontend
 only sends a version_id. Versions that aren't listed are rejected, never run as the baseline.
 
-The frontend also lists the planned two-ai and two-caches versions. They remain unavailable
-until their backend stages exist; the parallel entry is an explicitly labelled prototype, whose
+The frontend also lists the planned two-ai version, unavailable until model extraction exists.
+two-caches (V3) is V1 plus the evidence cache, with rule extraction until V2 is ready. The
+parallel entry is an explicitly labelled prototype, whose
 number of workers each request can set (api_helpers.require_version checks the bounds).
 """
 
@@ -30,6 +31,7 @@ class Version:
 VERSIONS = {v.id: v for v in [
     Version("baseline"),   # v0: no cache, rule-based extraction, sequential
     Version("claim-cache", caches=("claims",)),  # v1: exact verified-claim cache
+    Version("two-caches", caches=("claims", "evidence")),  # v3: v1 + cached page evidence (V2 not yet)
     # Parallel prototype: deliberately the same components as V1, so its speed difference
     # measures concurrency rather than mixing in the unfinished V2/V3 components.
     Version("parallel", caches=("claims",), parallel=True, workers=DEFAULT_WORKERS),
