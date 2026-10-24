@@ -4,6 +4,7 @@ errors and streamed responses. The rest of the backend (pipeline, versions, serv
 HTTP-free, so notebooks can import it.
 """
 
+import dataclasses
 import logging
 
 import anyio
@@ -14,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from pipeline import Run
 from schemas import Event, RunMetadata
-from versions import Version, get_version
+from versions import MAX_WORKERS, MIN_WORKERS, Version, get_version
 
 log = logging.getLogger("main")
 
@@ -29,13 +30,20 @@ class FrontendFiles(StaticFiles):
         return response
 
 
-def require_version(version_id) -> Version:
-    """The implemented version with this id, or HTTP 422: never fall back to the baseline."""
-    version = get_version(version_id)
+def require_version(body: RunMetadata) -> Version:
+    """The implemented version requested, or HTTP 422: never fall back to the baseline.
+    A parallel version takes its number of workers from the request's config, if it is in bounds."""
+    version = get_version(body.version_id)
     if version is None:
-        log.warning("rejected request: version %r is not implemented", version_id)
-        raise HTTPException(422, f"Version {version_id!r} is not implemented yet")
-    return version
+        log.warning("rejected request: version %r is not implemented", body.version_id)
+        raise HTTPException(422, f"Version {body.version_id!r} is not implemented yet")
+    if not version.parallel:
+        return version
+    workers = body.config.get("workers", version.workers)
+    if type(workers) is not int or not MIN_WORKERS <= workers <= MAX_WORKERS:   # type(): rejects True too
+        log.warning("rejected request: %r workers", workers)
+        raise HTTPException(422, f"workers must be a whole number from {MIN_WORKERS} to {MAX_WORKERS}, got {workers!r}")
+    return dataclasses.replace(version, workers=workers)
 
 
 def stream(request: Request, body: RunMetadata, version: Version, events: Run) -> StreamingResponse:

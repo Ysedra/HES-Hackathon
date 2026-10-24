@@ -25,7 +25,7 @@ from api_helpers import FrontendFiles, require_version, stream
 from pipeline import Pipeline
 from schemas import RunMetadata, TextRequest
 from services import storage
-from versions import VERSIONS
+from versions import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, VERSIONS
 
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -57,7 +57,8 @@ app = FastAPI(lifespan=lifespan)
 async def health():
     """Polled by the frontend's connection status. The models are loaded before the server
     accepts requests, so any answer means the backend is ready."""
-    return {"status": "ok", "versions": list(VERSIONS)}
+    return {"status": "ok", "versions": list(VERSIONS),
+            "workers": {"min": MIN_WORKERS, "max": MAX_WORKERS, "default": DEFAULT_WORKERS}}
 
 
 @app.post("/api/cache/claims/clear")
@@ -71,7 +72,7 @@ async def clear_claim_cache():
 @app.post("/api/analyse/text")
 async def analyse_text(body: TextRequest, request: Request):
     """Check typed text: it is split into sentences and each checkable one is verified."""
-    version = require_version(body.version_id)
+    version = require_version(body)
     log.info("run %s (%s): text, %d characters", body.run_id, version.id, len(body.text))
     return stream(request, body, version, state["pipeline"].run_text(version, body.run_id, body.text))
 
@@ -86,7 +87,7 @@ async def analyse_media(media: UploadFile, metadata: Annotated[str, Form()], req
         raise HTTPException(422, error.errors(include_url=False))
     if (media.size or 0) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "Files are limited to 100 MB")
-    version = require_version(body.version_id)
+    version = require_version(body)
     log.info("run %s (%s): media %r, %s, %d bytes", body.run_id, version.id,
              media.filename, media.content_type, media.size or 0)
     events = state["pipeline"].run_media(version, body.run_id, media.file, media.filename or "recording")

@@ -14,16 +14,20 @@ and claim reaches the browser as soon as it is ready:
 - metrics.update: latency so far
 - run.complete: the end of the run
 
-V0 and V1 are sequential. The V4 prototype runs the same current V1 work with up to three
-claims in flight, isolating the effect of concurrency before V2/V3 are connected.
+V0 and V1 are sequential: each claim is checked before the next segment is transcribed. The V4
+prototype runs the same V1 work concurrently, isolating the effect of concurrency before V2/V3 are
+connected: transcription and cache lookups in a producer thread, fresh checks in a pool of workers
+(chosen per run, within versions.MAX_WORKERS), NLI still one call at a time.
 """
 
 import logging
 import math
+import queue
 import statistics
+import threading
 import time
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import BinaryIO, Generator, Iterable
 from urllib.parse import urlparse
 
@@ -34,7 +38,6 @@ from versions import Version
 
 log = logging.getLogger("pipeline")
 CACHE_MODEL_VERSION = f"v1-exact:web-r2:{MODEL_VERSION}"
-PARALLEL_WORKERS = 3
 
 Event = tuple[str, dict]
 Run = Generator[Event, None, None]
@@ -63,17 +66,41 @@ class Pipeline:
     def _run(self, version, run_id, source_url, segments: Iterable[transcription.Segment]) -> Run:
         started = time.perf_counter()
         con = storage.connect()
-        cache_con = (storage.connect(storage.CACHE_DB_PATH)
-                     if "claims" in version.caches and not version.parallel else None)
-        executor = ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) if version.parallel else None
-        pending = {}
-        n_segments, claims = 0, []
+        claims = []
+        source_id = storage.create_source(con, source_url)
+        log.info("run %s: source %d (%s), %s", run_id, source_id, source_url,
+                 f"{version.workers} workers" if version.parallel else "sequential")
+        run = self._run_parallel if version.parallel else self._run_sequential
+        try:
+            n_segments = yield from run(version, con, source_id, segments, claims)
+            storage.set_source_status(con, source_id, "done")
+        except GeneratorExit:   # the browser closed the stream (new run, closed tab)
+            log.warning("run %s cancelled by the client (source %d marked failed)", run_id, source_id)
+            storage.set_source_status(con, source_id, "failed")
+            raise
+        except Exception:
+            log.exception("run %s failed (source %d marked failed)", run_id, source_id)
+            storage.set_source_status(con, source_id, "failed")   # keep what was saved
+            raise
+        finally:
+            con.close()
+
+        metrics = latency_metrics(claims, "claims" in version.caches)
+        log.info("run %s done in %.1f s: %d segments, %d claims %s, latency p50 %s ms, p95 %s ms",
+                 run_id, time.perf_counter() - started, n_segments, len(claims),
+                 dict(Counter(c.status for c in claims)), metrics.get("p50_ms"), metrics.get("p95_ms"))
+        if not n_segments:
+            log.warning("run %s: no speech was transcribed", run_id)
+        yield "run.complete", {}
+
+    def _claims(self, con, source_id, segments):
+        """Save each segment and find the checkable sentences it completes. Yields the
+        ("transcript.segment", data) events, and ("claim", (claim_id, claim, sentence, stable_at))
+        for each new claim, already stored as "checking"."""
         assembler = extraction.SentenceAssembler()
         seen_claims = set()   # one verification per normalized sentence for the entire run
-        source_id = storage.create_source(con, source_url)
-        log.info("run %s: source %d (%s)", run_id, source_id, source_url)
 
-        def check(sentences):
+        def claims_in(sentences):
             stable_at = storage.now_ms()   # every sentence in this completed batch is now stable
             for sentence in sentences:
                 key = " ".join(sentence.text.casefold().split())
@@ -87,76 +114,115 @@ class Pipeline:
                 claim_id = storage.insert_checking_claim(con, source_id, sentence, stable_at)
                 claim = ClaimOut(claim_id=f"claim-{claim_id}", claim_text=sentence.text, status="checking",
                                  segment_ids=[f"segment-{i}" for i in dict.fromkeys(sentence.segment_ids)])
-                yield "claim.update", claim.model_dump()   # shown as "Checking" while the search runs
-                if executor is not None:
-                    future = executor.submit(
-                        self._check_in_worker, version, claim_id, claim, sentence, stable_at
-                    )
-                    pending[future] = claim
-                else:
-                    self._check(con, cache_con, claim_id, claim, sentence, stable_at,
-                                version.source_policy)
-                    claims.append(claim)
-                    yield "claim.update", claim.model_dump()
-                    yield "metrics.update", latency_metrics(
-                        claims, cache_con is not None, queue_size=0
-                    )
+                yield "claim", (claim_id, claim, sentence, stable_at)
 
-        def drain(finish=False):
-            ready = as_completed(list(pending)) if finish else [future for future in pending if future.done()]
-            for future in ready:
-                claim = pending.pop(future)
-                future.result()   # unexpected worker errors fail the run instead of disappearing
+        for segment in segments:   # media: Whisper runs here, window by window
+            segment_id = storage.save_segment(con, source_id, segment)
+            log.info("segment %d [%d-%d ms]: %s", segment_id, segment.start_ms, segment.end_ms, segment.text)
+            yield "transcript.segment", SegmentOut(id=f"segment-{segment_id}", start_ms=segment.start_ms,
+                                                   end_ms=segment.end_ms, text=segment.text).model_dump()
+            yield from claims_in(assembler.add(segment_id, segment.start_ms, segment.end_ms, segment.text))
+        yield from claims_in(assembler.flush())   # the last sentence may have no closing punctuation
+
+    def _run_sequential(self, version, con, source_id, segments, claims):
+        """V0/V1: each claim is checked as soon as it is complete, before the next segment.
+        Returns the number of segments."""
+        cache_con = storage.connect(storage.CACHE_DB_PATH) if "claims" in version.caches else None
+        n_segments = 0
+        try:
+            for type_, data in self._claims(con, source_id, segments):
+                if type_ == "transcript.segment":
+                    n_segments += 1
+                    yield type_, data
+                    continue
+                claim_id, claim, sentence, stable_at = data
+                yield "claim.update", claim.model_dump()   # shown as "Checking" while the search runs
+                self._check(con, cache_con, claim_id, claim, sentence, stable_at, version.source_policy)
                 claims.append(claim)
                 yield "claim.update", claim.model_dump()
-                yield "metrics.update", latency_metrics(
-                    claims, "claims" in version.caches, queue_size=len(pending)
-                )
-
-        try:
-            for segment in segments:   # media: Whisper runs here, window by window
-                segment_id = storage.save_segment(con, source_id, segment)
-                n_segments += 1
-                log.info("segment %d [%d-%d ms]: %s", segment_id, segment.start_ms, segment.end_ms, segment.text)
-                yield "transcript.segment", SegmentOut(id=f"segment-{segment_id}", start_ms=segment.start_ms,
-                                                       end_ms=segment.end_ms, text=segment.text).model_dump()
-                yield from check(assembler.add(segment_id, segment.start_ms, segment.end_ms, segment.text))
-                if executor is not None:
-                    yield from drain()
-            yield from check(assembler.flush())   # the last sentence may have no closing punctuation
-            if executor is not None:
-                yield from drain(finish=True)
-            storage.set_source_status(con, source_id, "done")
-        except GeneratorExit:   # the browser closed the stream (new run, closed tab)
-            log.warning("run %s cancelled by the client (source %d marked failed)", run_id, source_id)
-            storage.set_source_status(con, source_id, "failed")
-            raise
-        except Exception:
-            log.exception("run %s failed (source %d marked failed)", run_id, source_id)
-            storage.set_source_status(con, source_id, "failed")   # keep what was saved
-            raise
+                yield "metrics.update", latency_metrics(claims, cache_con is not None)
         finally:
-            con.close()
             if cache_con is not None:
                 cache_con.close()
-            if executor is not None:
-                executor.shutdown(wait=False, cancel_futures=True)
+        return n_segments
 
-        metrics = latency_metrics(claims, "claims" in version.caches)
-        log.info("run %s done in %.1f s: %d segments, %d claims %s, latency p50 %s ms, p95 %s ms",
-                 run_id, time.perf_counter() - started, n_segments, len(claims),
-                 dict(Counter(c.status for c in claims)), metrics.get("p50_ms"), metrics.get("p95_ms"))
-        if not n_segments:
-            log.warning("run %s: no speech was transcribed", run_id)
-        yield "run.complete", {}
+    def _run_parallel(self, version, con, source_id, segments, claims):
+        """V4: a producer thread transcribes, splits sentences and answers cache hits at once;
+        cache misses go to a pool of version.workers threads for the fresh check. Both put their
+        results on one queue, which this generator empties, so each verdict is sent as soon as it
+        is ready, even while Whisper works on the next window. Returns the number of segments."""
+        results = queue.Queue()   # (kind, data); kinds: event, hit, submitted, checked, produced, error
+        stop = threading.Event()   # set when the run ends early: the producer stops after its current step
+        executor = ThreadPoolExecutor(max_workers=version.workers)
 
-    def _check_in_worker(self, version, claim_id, claim, sentence, stable_at):
-        """Give each parallel task its own SQLite connections; connections are never shared."""
+        def fresh_check(claim_id, claim, sentence, stable_at, lookup_ms):
+            try:
+                self._check_in_worker(version, claim_id, claim, sentence, stable_at, lookup_ms)
+                results.put(("checked", claim))
+            except BaseException as error:   # failed checks are handled in _check_fresh: this is a bug
+                results.put(("error", error))
+
+        def produce():
+            # Its own connections: the generator thread still uses con, for the source status
+            producer_con = storage.connect()
+            cache_con = storage.connect(storage.CACHE_DB_PATH) if "claims" in version.caches else None
+            try:
+                for type_, data in self._claims(producer_con, source_id, segments):
+                    if stop.is_set():
+                        return
+                    if type_ == "transcript.segment":
+                        results.put(("event", (type_, data)))
+                        continue
+                    claim_id, claim, sentence, stable_at = data
+                    results.put(("event", ("claim.update", claim.model_dump())))   # "Checking"
+                    done, lookup_ms = self._check_cached(producer_con, cache_con, claim_id, claim,
+                                                         sentence, stable_at)
+                    if done:
+                        results.put(("hit", claim))
+                    else:
+                        results.put(("submitted", None))   # before submit, so it's counted before its result
+                        executor.submit(fresh_check, claim_id, claim, sentence, stable_at, lookup_ms)
+                results.put(("produced", None))
+            except BaseException as error:
+                results.put(("error", error))
+            finally:
+                producer_con.close()
+                if cache_con is not None:
+                    cache_con.close()
+
+        threading.Thread(target=produce, name=f"producer-{source_id}", daemon=True).start()
+        n_segments, pending, produced = 0, 0, False
+        try:
+            while not (produced and pending == 0):
+                kind, data = results.get()
+                if kind == "error":
+                    raise data   # unexpected errors fail the run instead of disappearing
+                if kind == "produced":
+                    produced = True
+                elif kind == "submitted":
+                    pending += 1
+                elif kind == "event":
+                    n_segments += data[0] == "transcript.segment"
+                    yield data
+                else:   # a verdict: "hit" from the cache or "checked" by a worker
+                    pending -= kind == "checked"
+                    claims.append(data)
+                    yield "claim.update", data.model_dump()
+                    yield "metrics.update", latency_metrics(
+                        claims, "claims" in version.caches, queue_size=pending
+                    )
+        finally:
+            stop.set()
+            executor.shutdown(wait=False, cancel_futures=True)
+        return n_segments
+
+    def _check_in_worker(self, version, claim_id, claim, sentence, stable_at, lookup_ms):
+        """A fresh check in a pool thread, with its own SQLite connections; connections are never shared."""
         con = storage.connect()
         cache_con = storage.connect(storage.CACHE_DB_PATH) if "claims" in version.caches else None
         try:
-            self._check(con, cache_con, claim_id, claim, sentence, stable_at,
-                        version.source_policy)
+            self._check_fresh(con, cache_con, claim_id, claim, sentence, stable_at,
+                              version.source_policy, lookup_ms)
         finally:
             con.close()
             if cache_con is not None:
@@ -164,66 +230,82 @@ class Pipeline:
 
     def _check(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at,
                source_policy="wikipedia_first"):
-        """Check one sentence, store the result and fill in claim. A failed check doesn't stop the run."""
+        """Check one sentence in this thread: the claim cache first, then a fresh check on a miss."""
+        done, lookup_ms = self._check_cached(con, cache_con, claim_id, claim, sentence, stable_at)
+        if not done:
+            self._check_fresh(con, cache_con, claim_id, claim, sentence, stable_at, source_policy, lookup_ms)
+
+    def _check_cached(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at):
+        """Answer from the claim cache if it holds this sentence: store the result and fill in claim.
+        Returns (done, lookup time in ms); done is False on a miss or without a cache."""
+        if cache_con is None:
+            return False, 0.0
         started = time.perf_counter()
-        cache_lookup_ms = 0.0
         try:
+            result = storage.lookup_cached_claim(cache_con, sentence.text, CACHE_MODEL_VERSION)
+        except Exception as error:
+            log.warning("claim %d cache lookup failed: %s", claim_id, error)
             result = None
+        lookup_ms = (time.perf_counter() - started) * 1000
+        if result is None:
+            return False, lookup_ms
+        try:
+            result["timings_ms"] = {"cache_lookup": round(lookup_ms, 2),
+                                    "total": round((time.perf_counter() - started) * 1000, 2)}
+            result["explanation"] = result.get("explanation") or explain(result)
+            verdict_at = storage.save_result(
+                con, claim_id, result, MODEL_VERSION, passage_stance, path="claims_cache"
+            )
+        except Exception as error:
+            self._fail(con, claim_id, claim, sentence, error)
+        else:
+            self._fill(claim_id, claim, sentence, result, "claims_cache", verdict_at - stable_at)
+        return True, lookup_ms
+
+    def _check_fresh(self, con, cache_con, claim_id, claim: ClaimOut, sentence, stable_at,
+                     source_policy="wikipedia_first", lookup_ms=0.0):
+        """Search the web and run NLI, store the result (and cache it) and fill in claim.
+        A failed check doesn't stop the run."""
+        started = time.perf_counter()
+        try:
+            result = self.verifier.check_claim(sentence.text, source_policy)
+            result["explanation"] = explain(result)
             if cache_con is not None:
-                lookup_started = time.perf_counter()
+                result["timings_ms"]["cache_lookup"] = round(lookup_ms, 2)
+                write_started = time.perf_counter()
                 try:
-                    result = storage.lookup_cached_claim(
-                        cache_con, sentence.text, CACHE_MODEL_VERSION
+                    storage.save_cached_claim(
+                        cache_con, sentence.text, result, CACHE_MODEL_VERSION
                     )
                 except Exception as error:
-                    log.warning("claim %d cache lookup failed: %s", claim_id, error)
-                cache_lookup_ms = (time.perf_counter() - lookup_started) * 1000
-
-            if result is not None:
-                result["timings_ms"] = {
-                    "cache_lookup": round(cache_lookup_ms, 2),
-                    "total": round((time.perf_counter() - started) * 1000, 2),
-                }
-                result["explanation"] = result.get("explanation") or explain(result)
-                verdict_at = storage.save_result(
-                    con, claim_id, result, MODEL_VERSION, passage_stance, path="claims_cache"
+                    log.warning("claim %d cache write failed: %s", claim_id, error)
+                    result["errors"].append(f"Cache write failed: {error}")
+                result["timings_ms"]["cache_write"] = round(
+                    (time.perf_counter() - write_started) * 1000, 2
                 )
-                path = "claims_cache"
-            else:
-                result = self.verifier.check_claim(sentence.text, source_policy)
-                result["explanation"] = explain(result)
-                if cache_con is not None:
-                    result["timings_ms"]["cache_lookup"] = round(cache_lookup_ms, 2)
-                    write_started = time.perf_counter()
-                    try:
-                        storage.save_cached_claim(
-                            cache_con, sentence.text, result, CACHE_MODEL_VERSION
-                        )
-                    except Exception as error:
-                        log.warning("claim %d cache write failed: %s", claim_id, error)
-                        result["errors"].append(f"Cache write failed: {error}")
-                    result["timings_ms"]["cache_write"] = round(
-                        (time.perf_counter() - write_started) * 1000, 2
-                    )
-                    result["timings_ms"]["total"] = round(
-                        (time.perf_counter() - started) * 1000, 2
-                    )
-                verdict_at = storage.save_result(
-                    con, claim_id, result, MODEL_VERSION, passage_stance, path="fresh"
+                result["timings_ms"]["total"] = round(
+                    lookup_ms + (time.perf_counter() - started) * 1000, 2
                 )
-                path = "fresh"
+            verdict_at = storage.save_result(
+                con, claim_id, result, MODEL_VERSION, passage_stance, path="fresh"
+            )
         except Exception as error:
-            log.exception("claim %d failed: %s", claim_id, sentence.text)
-            storage.mark_claim_failed(con, claim_id)
-            claim.status = "not_checked"
-            claim.explanation = "The check failed before a verdict was reached."
-            claim.errors = [repr(error)]
+            self._fail(con, claim_id, claim, sentence, error)
             return
+        self._fill(claim_id, claim, sentence, result, "fresh", verdict_at - stable_at)
 
+    def _fail(self, con, claim_id, claim: ClaimOut, sentence, error):
+        log.exception("claim %d failed: %s", claim_id, sentence.text)
+        storage.mark_claim_failed(con, claim_id)
+        claim.status = "not_checked"
+        claim.explanation = "The check failed before a verdict was reached."
+        claim.errors = [repr(error)]
+
+    def _fill(self, claim_id, claim: ClaimOut, sentence, result, path, latency_ms):
         no_verdict = result["verdict"] in {"not_checkable", "retrieval_failed"}
         claim.status = "not_checked" if no_verdict else result["verdict"]
         claim.path = None if result["verdict"] == "not_checkable" else path
-        claim.latency_ms = verdict_at - stable_at
+        claim.latency_ms = latency_ms
         log.info("claim %d: %-13s%7.0f ms  %-12s %s", claim_id, result["verdict"],
                  result["timings_ms"]["total"], path, sentence.text)
         for error in result["errors"]:

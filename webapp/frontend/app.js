@@ -4,7 +4,7 @@ const VERSIONS = [
   { id: "claim-cache", stage: "IMPLEMENTED", label: "Claim cache", spec: "1 cache · 1 AI · sequential", description: "Reuse only page-backed verdicts; failed and uncertain checks are never cached.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: false, source_policy: "wikipedia_first" } },
   { id: "two-ai", stage: "PLANNED", label: "Two AI stages", spec: "1 cache · 2 AI · sequential", description: "Model-based claim extraction plus verification, with Wikipedia-first retrieval and web fallbacks.", config: { caches: ["claims"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_first" } },
   { id: "two-caches", stage: "PLANNED", label: "Two cache layers", spec: "2 caches · 2 AI · Wikipedia only", description: "Add a page-evidence cache and deliberately limit retrieval to Wikipedia for a controlled source experiment.", config: { caches: ["claims", "evidence"], extraction: "model", ai_count: 2, parallel: false, source_policy: "wikipedia_only" } },
-  { id: "parallel", stage: "PROTOTYPE", label: "Parallel pipeline", spec: "Current V1 · 3 workers", description: "Runs the current V1 components concurrently to isolate the speedup. V2 and V3 will be added to this V4 target later.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: true, source_policy: "wikipedia_first" } }
+  { id: "parallel", stage: "PROTOTYPE", label: "Parallel pipeline", spec: "Current V1 · adjustable workers", description: "Runs the current V1 components concurrently to isolate the speedup. V2 and V3 will be added to this V4 target later.", config: { caches: ["claims"], extraction: "rules", ai_count: 1, parallel: true, source_policy: "wikipedia_first" } }
 ];
 const STATUS = { not_checked: "Not checked", not_checkable: "Not checkable", checking: "Checking", supported: "Supported", contradicted: "Contradicted", uncertain: "Uncertain" };
 const ROUTES = { fresh: "Fresh retrieval", claims_cache: "Claim cache", evidence_cache: "Evidence cache" };
@@ -12,10 +12,13 @@ const $ = id => document.getElementById(id);
 const state = {
   version: "baseline", runs: new Map(), history: [], timers: [], busy: false,
   controller: null, eventSource: null, recorder: null, stream: null,
-  requestingMic: false, micTimer: null, media: null, mediaUrl: null, backend: null
+  requestingMic: false, micTimer: null, media: null, mediaUrl: null, backend: null, workers: null
 };
 const version = () => VERSIONS.find(item => item.id === state.version);
 const activeRun = () => state.runs.get(state.version);
+// Worker threads for the parallel version: the backend reports its bounds in /api/health.
+const workerBounds = () => ({ min: 1, max: 8, default: 3, ...state.backend?.workers });
+const workers = () => { const b = workerBounds(); return Math.min(b.max, Math.max(b.min, state.workers ?? b.default)); };
 const finite = value => typeof value === "number" && Number.isFinite(value);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 const formatMs = value => finite(value) && value >= 0 ? `${value < 1000 ? Math.round(value) : (value / 1000).toFixed(2)} ${value < 1000 ? "ms" : "s"}` : "—";
@@ -45,8 +48,10 @@ function stopEvents() {
 }
 function beginRun(preview = false) {
   stopEvents();
+  const config = structuredClone(version().config);
+  if (config.parallel) config.workers = workers();
   const run = {
-    id: crypto.randomUUID(), version_id: state.version, config: structuredClone(version().config),
+    id: crypto.randomUUID(), version_id: state.version, config,
     preview, segments: new Map(), claims: new Map(), selected: null, metrics: {},
     started_at: new Date().toISOString(), completed: false,
     notice: preview ? "INTERFACE DEMO · Illustrative verdicts, scores and passages. No models or searches have run." : "Ready for input. Live transcription and verification need the local backend.",
@@ -68,8 +73,12 @@ function renderVersions() {
     version().config.extraction === "model" ? "AI extraction" : "Rule extraction",
     ...version().config.caches.map(cache => cache === "claims" ? "Claim cache" : "Evidence cache"),
     version().config.source_policy === "wikipedia_only" ? "Wikipedia only" : "Wikipedia first + web fallback",
-    "NLI verification", version().config.parallel ? "3 parallel workers" : "Sequential"
+    "NLI verification", version().config.parallel ? `${workers()} parallel workers` : "Sequential"
   ].map(label => `<span>${label}</span>`).join("");
+  const bounds = workerBounds(), slider = $("workersInput");
+  $("workersControl").hidden = !version().config.parallel;
+  Object.assign(slider, { min: bounds.min, max: bounds.max, value: workers(), disabled: state.busy || Boolean(state.recorder) || state.requestingMic });
+  $("workersValue").textContent = workers();
 }
 function selectVersion(id) {
   if (!VERSIONS.some(item => item.id === id) || state.busy || state.recorder || state.requestingMic) return false;
@@ -177,7 +186,8 @@ function renderMetrics() {
 function renderComparison() {
   $("comparisonBody").innerHTML = VERSIONS.map(item => {
     const run = state.history.findLast(row => row.version_id === item.id);
-    return `<tr><td>${item.label}</td><td>${run ? esc(new Date(run.started_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})) : "Not run"}</td><td>${run ? run.claims.length : "—"}</td><td>${formatMs(run?.metrics.p50_ms)}</td><td>${formatMs(run?.metrics.p95_ms)}</td><td>${run ? metricCache(run.metrics) : "—"}</td></tr>`;
+    const label = run?.config.workers ? `${item.label} ×${run.config.workers}` : item.label;
+    return `<tr><td>${label}</td><td>${run ? esc(new Date(run.started_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})) : "Not run"}</td><td>${run ? run.claims.length : "—"}</td><td>${formatMs(run?.metrics.p50_ms)}</td><td>${formatMs(run?.metrics.p95_ms)}</td><td>${run ? metricCache(run.metrics) : "—"}</td></tr>`;
   }).join("");
   $("exportButton").disabled = !state.history.length;
 }
@@ -453,6 +463,7 @@ $("demoButton").addEventListener("click", demo);
 $("clearButton").addEventListener("click", () => beginRun());
 $("clearCacheButton").addEventListener("click", clearClaimCache);
 $("claimsOnly").addEventListener("change", renderTranscript);
+$("workersInput").addEventListener("input", event => { state.workers = Number(event.target.value); renderVersions(); });
 $("uploadButton").addEventListener("click", () => $("mediaInput").click());
 $("mediaInput").addEventListener("change", event => {
   const file = event.target.files[0];

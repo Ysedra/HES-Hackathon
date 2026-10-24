@@ -19,7 +19,7 @@
 <section aria-labelledby="versionsTitle">
   <div class="section-heading"><h2 id="versionsTitle">01 <span>Pipeline version</span></h2><span>Compare architecture, not just verdicts</span></div>
   <div id="versionList" class="version-list" role="group" aria-label="Select experiment version"></div>
-  <div class="pipeline-summary"><span id="versionDescription"></span><span id="pipelineSummary" class="pipeline-pills"></span></div>
+  <div class="pipeline-summary"><span id="versionDescription"></span><label id="workersControl" class="workers-control" hidden>Workers <input id="workersInput" type="range" step="1"> <output id="workersValue" for="workersInput"></output></label><span id="pipelineSummary" class="pipeline-pills"></span></div>
   <p class="subtle definition-note">Working definition: cache 1 = verified claims; cache 2 = evidence. AI 1 = verification; AI 2 extracts checkable claims. V0 and V1 are implemented; V2/V3 are planned; V3 is the Wikipedia-only source experiment. V4 currently runs V1's work in parallel so its speed effect can be measured separately.</p>
 </section>
 <section class="workspace">
