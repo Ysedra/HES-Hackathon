@@ -15,7 +15,7 @@ Open <http://localhost:8000/>. Use **Try interface demo** to see a compound snip
 
 A plain static server (e.g. `python -m http.server`) still shows the interface and the demo, but cannot handle the `POST /api/analyse/...` routes. Missing endpoints produce an explicit error, never synthetic verdicts. The media player is a local preview, not live transcription.
 
-The connection status in the top bar polls `GET /api/health` every 5 seconds, on window focus, and after a failed run. The backend answers `{"status": "ok", "versions": [...]}` once its models are loaded; the status is green when the selected version is listed, amber when it is not, and grey when the backend does not answer.
+The connection status in the top bar polls `GET /api/health` every 5 seconds, on window focus, and after a failed run. The backend answers `{"status": "ok", "versions": [...], "workers": {"min": 1, "max": 8, "default": 3}}` once its models are loaded (`workers` bounds the parallel version's slider; `max` is lower on machines with fewer than 8 cores); the status is green when the selected version is listed, amber when it is not, and grey when the backend does not answer.
 
 ## Versions
 
@@ -24,8 +24,8 @@ The connection status in the top bar polls `GET /api/health` every 5 seconds, on
 | `baseline` | None | Verification; rule-based extraction | Sequential |
 | `claim-cache` | Verified claims | Verification; rule-based extraction | Sequential |
 | `two-ai` | Verified claims | Model-based extraction + verification | Sequential |
-| `two-caches` | Verified claims + evidence | Model-based extraction + verification; Wikipedia-only retrieval | Sequential |
-| `parallel` | Verified claims (prototype) | Current rule extraction + verification | Three workers |
+| `two-caches` | Verified claims + evidence (full-text index of downloaded page sentences) | Rule-based extraction + verification (model extraction once V2 exists) | Sequential |
+| `parallel` | Verified claims (prototype) | Current rule extraction + verification | 1–8 workers (GUI slider, default 3) |
 
 These are provisional definitions. Change `VERSIONS` in `app.js` if the team chooses a different role for the second AI stage or first cache. A version selection passes configuration to the backend; it does **not** implement the optimisation. Unsupported configurations must be rejected by the backend (for example HTTP 422), not silently run as the baseline.
 
@@ -43,7 +43,7 @@ Use localhost or HTTPS for microphone permission. No real microphone recording o
 
 ## Local HTTP adapter
 
-There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (V0), `claim-cache` (V1), and the `parallel` V4 prototype. Both routes are documented, and can be tried, at <http://localhost:8000/docs>.
+There is one route per input type, implemented in `webapp/backend/main.py` with the shapes below in `webapp/backend/schemas.py`. They currently support `baseline` (V0), `claim-cache` (V1), `two-caches` (V3) and the `parallel` V4 prototype. Both routes are documented, and can be tried, at <http://localhost:8000/docs>.
 
 `POST /api/analyse/text` takes JSON:
 
@@ -66,7 +66,7 @@ There is one route per input type, implemented in `webapp/backend/main.py` with 
 - `media`: the complete file/recording (up to 100 MB);
 - `metadata`: a JSON string containing the same `run_id`, `version_id`, and `config`.
 
-Validate the version against a backend-owned configuration. Return HTTP errors for invalid requests and unavailable versions, before streaming starts.
+Validate the version against a backend-owned configuration. Return HTTP errors for invalid requests and unavailable versions, before streaming starts. For `parallel`, `config.workers` sets the number of claim-checking threads; a value outside the `/api/health` bounds is rejected with HTTP 422.
 
 Both routes stream the same response as NDJSON (`Content-Type: application/x-ndjson`): one event per line, in the same envelope as the asynchronous events below, sent as soon as each step finishes. The dashboard updates with every line, so segments and claims appear while the rest of the input is still being processed:
 
@@ -162,7 +162,7 @@ For SSE, `window.veriflow.connect("/events")` adds the current IDs as query para
 
 The UI records completed real runs separately by version and can export their inputs, claims, configuration and backend metrics as JSON. Exports therefore contain what the professor said: treat them as local test data, not telemetry to upload automatically. Demo fixtures are excluded.
 
-Connected (`baseline`, `claim-cache`, and the `parallel` prototype): the HTTP adapter, health check, text/uploads/recordings, rule-based sentence claims, deterministic Wikipedia-first retrieval, page-only verdict evidence, NLI scores, explanations, timings, V1 cold/warm cache measurements, run-wide duplicate suppression, and three-worker verification.
+Connected (`baseline`, `claim-cache`, and the `parallel` prototype): the HTTP adapter, health check, text/uploads/recordings, rule-based sentence claims, deterministic Wikipedia-first retrieval, page-only verdict evidence, NLI scores, explanations, timings, V1 cold/warm cache measurements, run-wide duplicate suppression, and parallel verification with a selectable number of workers.
 
 Still to connect:
 1. Model-based atomic-claim extraction (v0 treats each checkable sentence as one claim).

@@ -12,9 +12,13 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[3] / "database" / "app.db"
 CACHE_DB_PATH = DB_PATH.with_name("v1_claim_cache.db")
+EVIDENCE_DB_PATH = DB_PATH.with_name("v3_evidence_cache.db")
 VERDICT_TTL_MS = 7 * 24 * 60 * 60 * 1000   # how long a verdict stays reusable in verified_claims
 CACHE_TTL_MS = 60 * 60 * 1000
 MAX_CACHE_ENTRIES = 1000
+EVIDENCE_TTL_MS = 24 * 60 * 60 * 1000   # page text changes slowly
+MAX_CACHED_PAGES = 500
+MAX_SENTENCES_PER_PAGE = 2000
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources (
@@ -112,6 +116,22 @@ CREATE INDEX IF NOT EXISTS idx_evidence_lru ON evidence (last_used_at);
 CREATE INDEX IF NOT EXISTS idx_evidence_url ON evidence (source_url);
 CREATE INDEX IF NOT EXISTS idx_verdict_evidence_evidence ON verdict_evidence (evidence_id);
 CREATE INDEX IF NOT EXISTS idx_verified_claim_text ON verified_claims (claim_text);
+CREATE INDEX IF NOT EXISTS idx_evidence_fetched ON evidence (fetched_at);
+"""
+
+# V3's evidence cache: the prose sentences of every downloaded page, kept in the evidence table
+# (cache 2) of its own file and searched through a full-text index over that table, so a claim
+# about an already-fetched topic can skip search and download. One page = its rows with that
+# source_url; expiry uses fetched_at, and least-recently-used pruning uses last_used_at.
+EVIDENCE_SEARCH_INDEX = """
+CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts
+  USING fts5(evidence_text, content='evidence', content_rowid='id');
+CREATE TRIGGER IF NOT EXISTS evidence_fts_insert AFTER INSERT ON evidence BEGIN
+  INSERT INTO evidence_fts (rowid, evidence_text) VALUES (new.id, new.evidence_text);
+END;
+CREATE TRIGGER IF NOT EXISTS evidence_fts_delete AFTER DELETE ON evidence BEGIN
+  INSERT INTO evidence_fts (evidence_fts, rowid, evidence_text) VALUES ('delete', old.id, old.evidence_text);
+END;
 """
 
 
@@ -383,6 +403,82 @@ def clear_claim_cache():
             ).fetchall()
             _delete_cached_claims(con, [row[0] for row in rows])
         return len(rows)
+    finally:
+        con.close()
+
+
+def init_evidence_cache():
+    """Create/migrate V3's separate evidence cache: the evidence table plus its full-text index."""
+    init_db(EVIDENCE_DB_PATH)
+    con = connect(EVIDENCE_DB_PATH)
+    try:
+        columns = {row[1] for row in con.execute("PRAGMA table_info(evidence)")}
+        with con:
+            if "cache_version" not in columns:
+                con.execute("ALTER TABLE evidence ADD COLUMN cache_version TEXT NOT NULL DEFAULT ''")
+            con.executescript(EVIDENCE_SEARCH_INDEX)
+    finally:
+        con.close()
+
+
+def _delete_cached_pages(con, urls):
+    con.executemany("DELETE FROM evidence WHERE source_url = ?", [(url,) for url in urls])
+
+
+def prune_evidence_cache(con):
+    """Remove expired pages, then the least recently used beyond MAX_CACHED_PAGES."""
+    con.execute("DELETE FROM evidence WHERE fetched_at <= ?", (now_ms() - EVIDENCE_TTL_MS,))
+    overflow = con.execute(
+        """SELECT source_url FROM evidence GROUP BY source_url
+           ORDER BY MAX(COALESCE(last_used_at, fetched_at)) DESC LIMIT -1 OFFSET ?""",
+        (MAX_CACHED_PAGES,),
+    ).fetchall()
+    _delete_cached_pages(con, [row[0] for row in overflow])
+
+
+def save_cached_page(con, url, sentences, cache_version):
+    """Store a downloaded page's prose sentences, replacing an older copy of the same page."""
+    fetched_at = now_ms()
+    with con:
+        _delete_cached_pages(con, [url])
+        con.executemany(
+            """INSERT INTO evidence (evidence_text, source_url, fetched_at, last_used_at, cache_version)
+               VALUES (?, ?, ?, ?, ?)""",
+            [(sentence, url, fetched_at, fetched_at, cache_version)
+             for sentence in sentences[:MAX_SENTENCES_PER_PAGE]],
+        )
+        prune_evidence_cache(con)
+
+
+def lookup_cached_evidence(con, words, cache_version, limit=50):
+    """Cached sentences sharing words with a claim, best full-text matches first, from pages
+    that are still valid. Returns [(text, url)]; the caller decides which are relevant."""
+    words = [word for word in words if word.strip()]
+    if not words:
+        return []
+    query = " OR ".join('"' + word.replace('"', '""') + '"' for word in words)
+    rows = con.execute(
+        """SELECT e.evidence_text, e.source_url FROM evidence_fts
+           JOIN evidence AS e ON e.id = evidence_fts.rowid
+           WHERE evidence_fts MATCH ? AND e.cache_version = ? AND e.fetched_at > ?
+           ORDER BY bm25(evidence_fts) LIMIT ?""",
+        (query, cache_version, now_ms() - EVIDENCE_TTL_MS, limit),
+    ).fetchall()
+    if rows:
+        with con:
+            con.executemany("UPDATE evidence SET last_used_at = ? WHERE source_url = ?",
+                            [(now_ms(), url) for url in {url for _, url in rows}])
+    return rows
+
+
+def clear_evidence_cache():
+    """Clear V3's evidence cache; returns the number of pages removed."""
+    con = connect(EVIDENCE_DB_PATH)
+    try:
+        with con:
+            pages = con.execute("SELECT COUNT(DISTINCT source_url) FROM evidence").fetchone()[0]
+            con.execute("DELETE FROM evidence")
+        return pages
     finally:
         con.close()
 

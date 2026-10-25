@@ -30,6 +30,7 @@ h2{font-size:11px;color:#8c9aa0;font-weight:650;display:flex;gap:10px;align-item
 .version-card strong{display:block;font-size:14px;font-weight:650;margin-bottom:5px}.version-card .spec{font-size:10px;color:var(--muted)}
 .pipeline-summary{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:14px;font-size:12px;color:var(--muted)}
 .pipeline-pills{display:flex;flex-wrap:wrap;gap:5px}.pipeline-pills span{background:#ecf0f2;border:1px solid var(--line);padding:3px 8px;border-radius:5px;font-size:9px;white-space:nowrap}
+.workers-control{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:11px}.workers-control[hidden]{display:none}.workers-control input{accent-color:var(--accent);width:120px}.workers-control output{min-width:1.5em;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .subtle{font-size:11px;line-height:1.6;color:var(--muted)}.definition-note{font-size:10px;margin:10px 0 25px;max-width:1100px}
 .workspace{display:grid;grid-template-columns:minmax(260px,.87fr) minmax(300px,1.15fr) minmax(300px,1fr);align-items:start;gap:16px}
 .left-column{display:grid;gap:16px}.panel{background:white;border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
