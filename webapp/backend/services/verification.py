@@ -1,5 +1,5 @@
 """
-Claim verification (v0, from ai_agent.ipynb via pipeline_v0.ipynb): open web search, evidence
+Claim verification (from the V0 notebooks, now shared by V0/V1/V3/V4): open web search, evidence
 passages from the result pages, then the NLI model scores each passage against the claim.
 
 Retrieval failure gives "retrieval_failed"; only usable but inconclusive evidence gives
@@ -121,8 +121,8 @@ class Verifier:
             result["errors"].extend(errors)
             timings["retrieval"] = (time.perf_counter() - stage) * 1000
 
-            # Search snippets help locate a page, but they are often titles, table rows or
-            # truncated text. A verdict must be backed by prose extracted from a page.
+            # A verdict must be backed by prose extracted from a page. Search snippets never enter
+            # the candidate set: they are often titles, table rows or truncated text.
             stage = time.perf_counter()
             self._score(text, [p for p in passages if p["source_type"] == "page"], result)
             timings["verification"] = (time.perf_counter() - stage) * 1000
@@ -312,9 +312,6 @@ def collect_evidence(claim, search_results, on_page=None):
         if not source_context_matches(claim, result):
             errors.append(f"Skipped title-matched entertainment source without matching claim context: {url}")
             continue
-        snippet = result.get("body") or result.get("snippet") or ""
-        if snippet:
-            candidates.append((snippet, url, "search_snippet"))
         try:
             html = fetch_url(url, config=PAGE_DOWNLOAD_CONFIG)
             text = extract(html, include_comments=False) if html else None

@@ -42,7 +42,7 @@ class SegmentOut(BaseModel):
 class EvidenceOut(BaseModel):
     text: str
     url: str
-    source_type: str        # "page" or "search_snippet"
+    source_type: str        # "page"; search snippets are never accepted as verdict evidence
     scores: dict[str, float]   # NLI entailment, contradiction, neutral
 
 

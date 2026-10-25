@@ -15,10 +15,11 @@ and claim reaches the browser as soon as it is ready:
 - metrics.update: latency so far
 - run.complete: the end of the run
 
-V0 and V1 are sequential: each claim is checked before the next segment is transcribed. The V4
-prototype runs the same V1 work concurrently, isolating the effect of concurrency before V2/V3 are
-connected: transcription and cache lookups in a producer thread, fresh checks in a pool of workers
-(chosen per run, within versions.MAX_WORKERS), NLI still one call at a time.
+V0, V1 and V3 are sequential: each claim is checked before the next segment is transcribed. The V4
+prototype runs the same V1 work concurrently, isolating the effect of concurrency before V2 is
+implemented and before V3 is combined with it: transcription and cache lookups in a producer
+thread, fresh checks in a pool of workers (chosen per run, within versions.MAX_WORKERS), NLI still
+one call at a time.
 """
 
 import logging
@@ -180,7 +181,7 @@ class Pipeline:
         yield from claims_in(assembler.flush())   # the last sentence may have no closing punctuation
 
     def _run_sequential(self, version, con, source_id, segments, claims):
-        """V0/V1: each claim is checked as soon as it is complete, before the next segment.
+        """V0/V1/V3: each claim is checked as soon as it is complete, before the next segment.
         Returns the number of segments."""
         cache_con = storage.connect(storage.CACHE_DB_PATH) if "claims" in version.caches else None
         evidence_cache = EvidenceCache() if "evidence" in version.caches else None

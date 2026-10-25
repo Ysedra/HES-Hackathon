@@ -162,11 +162,10 @@ For SSE, `window.veriflow.connect("/events")` adds the current IDs as query para
 
 The UI records completed real runs separately by version and can export their inputs, claims, configuration and backend metrics as JSON. Exports therefore contain what the professor said: treat them as local test data, not telemetry to upload automatically. Demo fixtures are excluded.
 
-Connected (`baseline`, `claim-cache`, and the `parallel` prototype): the HTTP adapter, health check, text/uploads/recordings, rule-based sentence claims, deterministic Wikipedia-first retrieval, page-only verdict evidence, NLI scores, explanations, timings, V1 cold/warm cache measurements, run-wide duplicate suppression, and parallel verification with a selectable number of workers.
+Connected (`baseline`, `claim-cache`, `two-caches`, and the `parallel` prototype): the HTTP adapter, health check, text/uploads/recordings/live audio, rule-based sentence claims, concurrent Wikipedia/DuckDuckGo/Brave retrieval with deterministic result ordering, page-only verdict evidence, NLI scores, explanations, timings, V1 cold/warm cache measurements, V3 evidence-cache measurements, run-wide duplicate suppression, and parallel verification with a selectable number of workers.
 
 Still to connect:
 1. Model-based atomic-claim extraction (v0 treats each checkable sentence as one claim).
-2. Live loopback/microphone transcription (SSE or a streamed endpoint); recordings and files already stream their results.
-3. The V2+ version configurations and the evidence-cache policy.
+2. The full V4 target combining the implemented components; the current V4 deliberately reuses V1 so its measurements isolate claim-level concurrency.
 
 The frontend itself has no dependencies; the backend's are in the root `pyproject.toml`.

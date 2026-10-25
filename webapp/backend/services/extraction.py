@@ -2,7 +2,8 @@
 Claim extraction, rule-based (v0, from pipeline_v0.ipynb and ai_agent.ipynb).
 
 Transcript segments are regrouped into complete sentences; each checkable sentence is one claim.
-Model-based extraction (claim_extraction.ipynb) will replace this for the later versions.
+Model-based extraction (claim_extraction.ipynb) is the planned V2; the implemented versions still
+use these deliberately small, explainable rules.
 """
 
 import re
@@ -82,11 +83,17 @@ QUESTION_STARTS = {
     "who", "what", "when", "where", "why", "how", "which",
     "is", "are", "do", "does", "did", "can", "could", "would", "should"
 }
-OPINION_MARKERS = {
-    "i think", "i believe", "i feel", "in my opinion", "i prefer",
-    "best", "worst", "better than", "worse than", "superior to", "inferior to",
-    "beautiful", "ugly", "delicious", "boring", "amazing", "favorite"
-}
+# Match opinion language in context instead of looking for arbitrary substrings.
+OPINION_PATTERNS = (
+    re.compile(r"\b(?:i think|i believe|i feel|in my opinion|i prefer)\b", re.IGNORECASE),
+    re.compile(r"\b(?:better|worse)\s+than\b|\b(?:superior|inferior)\s+to\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:is|are|was|were|seems?|looks?|tastes?)\s+(?:the\s+)?"
+        r"(?:best|worst|beautiful|ugly|delicious|boring|amazing)\b(?!-)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:my|our|your|his|her|their)\s+favou?rite\b", re.IGNORECASE),
+)
 META_TEXT = re.compile(r"\b(?:is|are)\s+(?:a|an|the)?\s*(?:statement|sentence|phrase|word|claim)\b")
 COMMAND_STARTS = {
     "please", "tell", "give", "show", "explain", "close", "open",
@@ -105,7 +112,7 @@ def is_checkable(text):
         return False
     if first_word in COMMAND_STARTS:
         return False
-    if any(marker in clean.lower() for marker in OPINION_MARKERS):
+    if any(pattern.search(clean) for pattern in OPINION_PATTERNS):
         return False
     if META_TEXT.search(clean.lower()):
         return False
