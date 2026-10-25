@@ -5,9 +5,12 @@ App setup and routes only: HTTP helpers are in api_helpers.py, the work happens 
 - GET  /api/health          ready check and implemented versions
 - POST /api/analyse/text    typed text (JSON)
 - POST /api/analyse/media   an uploaded file or microphone recording (multipart form)
+- POST /api/analyse/live    the computer's sound (loopback), transcribed by Kroko while it plays (JSON)
+- POST /api/analyse/live/stop   stop a live run: its last sentences are checked, then it completes
+- GET  /api/live/source     whether a live run records the computer's sound or the microphone
 - POST /api/cache/claims/clear, /api/cache/evidence/clear   reset the V1 / V3 experiment caches
 
-Both analyse routes stream the run as NDJSON events (see pipeline.py).
+The analyse routes stream the run as NDJSON events (see pipeline.py).
 Try them at http://localhost:8000/docs
 
 Run from the repository root:  uv run fastapi dev webapp/backend/main.py
@@ -15,6 +18,7 @@ Then open http://localhost:8000/
 """
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -24,8 +28,8 @@ from pydantic import ValidationError
 
 from api_helpers import FrontendFiles, require_version, stream
 from pipeline import Pipeline
-from schemas import RunMetadata, TextRequest
-from services import storage
+from schemas import LiveRequest, RunMetadata, StopRequest, TextRequest
+from services import storage, transcription
 from versions import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, VERSIONS
 
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
@@ -39,6 +43,7 @@ for noisy in ("primp", "urllib3", "httpx", "watchfiles"):   # one line per HTTP 
 log = logging.getLogger("main")
 
 state = {}
+live_runs = {}   # run_id -> threading.Event that stops that live run's capture
 
 
 @asynccontextmanager
@@ -101,6 +106,44 @@ async def analyse_media(media: UploadFile, metadata: Annotated[str, Form()], req
              media.filename, media.content_type, media.size or 0)
     events = state["pipeline"].run_media(version, body.run_id, media.file, media.filename or "recording")
     return stream(request, body, version, events)
+
+
+@app.post("/api/analyse/live")
+async def analyse_live(body: LiveRequest, request: Request):
+    """Listen to the computer's sound (loopback) and check its claims until /api/analyse/live/stop.
+    There is one audio device and one Kroko model, so a new live run stops the previous one."""
+    version = require_version(body)
+    for run_id, stop in list(live_runs.items()):
+        if not stop.is_set():
+            log.info("run %s: stopped by the new live run %s", run_id, body.run_id)
+        stop.set()
+        del live_runs[run_id]
+    stop = threading.Event()
+    live_runs[body.run_id] = stop
+    log.info("run %s (%s): live %s", body.run_id, version.id, body.source)
+    # live.html asks for the unfinished sentence too; the workspace page doesn't know that event
+    partials = body.config.get("partials") is True
+    events = state["pipeline"].run_live(version, body.run_id, stop, body.source, partials)
+    return stream(request, body, version, events)
+
+
+@app.get("/api/live/source")
+def live_source():
+    """What a live run will record: the computer's sound ("loopback") or, without a loopback
+    device (a Mac without BlackHole), the microphone. The live page warns about the microphone.
+    A plain def: FastAPI runs it in a worker thread, as the audio devices may take a moment."""
+    return transcription.live_source()
+
+
+@app.post("/api/analyse/live/stop")
+async def stop_live(body: StopRequest):
+    """Stop listening: the last sentences are transcribed and checked, then the run completes."""
+    stop = live_runs.pop(body.run_id, None)
+    if stop is None:
+        raise HTTPException(404, f"No live run {body.run_id!r}")
+    stop.set()
+    log.info("run %s: live capture stopped", body.run_id)
+    return {"status": "stopping"}
 
 
 # Mounted last so /api routes take priority

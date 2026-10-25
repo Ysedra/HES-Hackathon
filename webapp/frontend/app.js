@@ -12,7 +12,8 @@ const $ = id => document.getElementById(id);
 const state = {
   version: "baseline", runs: new Map(), history: [], timers: [], busy: false,
   controller: null, eventSource: null, recorder: null, stream: null,
-  requestingMic: false, micTimer: null, media: null, mediaUrl: null, backend: null, workers: null
+  requestingMic: false, micTimer: null, media: null, mediaUrl: null, backend: null, workers: null,
+  live: false
 };
 const version = () => VERSIONS.find(item => item.id === state.version);
 const activeRun = () => state.runs.get(state.version);
@@ -207,6 +208,9 @@ function render() {
   $("clearButton").disabled = Boolean(state.recorder) || state.requestingMic;
   $("clearCacheButton").disabled = locked || !state.backend;
   $("micButton").disabled = state.requestingMic || (state.busy && !state.recorder);
+  $("liveButton").disabled = state.live ? false : locked || !state.backend;
+  $("liveButton").setAttribute("aria-pressed", String(state.live));
+  $("liveButton").textContent = state.live ? "■ Stop listening" : "● Listen live to computer audio";
 }
 function setRunNotice(run, text, kind = "") {
   run.notice = text; run.noticeKind = kind;
@@ -264,7 +268,7 @@ async function analyse(input) {
   let timedOut = false, timeout;
   const resetTimeout = () => { clearTimeout(timeout); timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 120000); };
   resetTimeout();
-  setRunNotice(run, input.text ? "Sending text for claim extraction and verification…" : "Sending audio/video to local transcription and verification…");
+  setRunNotice(run, input.text ? "Sending text for claim extraction and verification…" : input.live ? "Starting live listening…" : "Sending audio/video to local transcription and verification…");
   render();
   try {
     let url, body, headers = {};
@@ -272,6 +276,10 @@ async function analyse(input) {
     if (input.text) {
       url = "/api/analyse/text";
       body = JSON.stringify({ ...metadata, text: input.text });
+      headers["Content-Type"] = "application/json";
+    } else if (input.live) {
+      url = "/api/analyse/live";
+      body = JSON.stringify({ ...metadata, source: input.live });
       headers["Content-Type"] = "application/json";
     } else {
       url = "/api/analyse/media";
@@ -285,7 +293,9 @@ async function analyse(input) {
       throw new Error(`Backend returned HTTP ${response.status}. No verdicts were fabricated.`);
     }
     if (!response.headers.get("content-type")?.includes("application/x-ndjson")) throw new Error("Expected a streamed pipeline response, not a static page.");
-    setRunNotice(run, input.text ? "Checking claims… results appear as each one is verified." : "Transcribing and checking claims… results appear as each one is verified.");
+    setRunNotice(run, input.text ? "Checking claims… results appear as each one is verified."
+      : input.live ? `Listening to the computer's sound (Kroko). Play a video; sentences and claims appear while it plays.${version().config.parallel ? "" : " This version pauses the transcript while it checks a claim: V4 keeps up better."}`
+      : "Transcribing and checking claims… results appear as each one is verified.");
     // One JSON event per line, applied as soon as it arrives
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = "", complete = false;
@@ -406,6 +416,27 @@ async function toggleMic() {
     setRunNotice(activeRun(), message, "error");
   }
 }
+// Live mode: the backend listens to the computer's sound until the second click.
+// The run then checks its last sentences and completes like any other run.
+async function toggleLive() {
+  if (state.live) {
+    const run = activeRun();
+    $("liveButton").disabled = true;
+    setRunNotice(run, "Stopping: the last sentences are being checked…");
+    try {
+      const response = await fetch("/api/analyse/live/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: run.id }) });
+      if (!response.ok) throw new Error(`Backend returned HTTP ${response.status}.`);
+    } catch (error) {
+      setRunNotice(run, `Could not stop listening: ${error.message}`, "error");
+      $("liveButton").disabled = false;
+    }
+    return;
+  }
+  if (state.busy || state.recorder || state.requestingMic) return;
+  state.live = true;
+  try { await analyse({ live: "loopback" }); }
+  finally { state.live = false; render(); }
+}
 function demo() {
   if (state.busy || state.recorder || state.requestingMic) return;
   const run = beginRun(true);
@@ -462,6 +493,7 @@ $("textForm").addEventListener("submit", event => {
   analyse({ text });
 });
 $("micButton").addEventListener("click", toggleMic);
+$("liveButton").addEventListener("click", toggleLive);
 $("demoButton").addEventListener("click", demo);
 $("clearButton").addEventListener("click", () => beginRun());
 $("clearCacheButton").addEventListener("click", clearCaches);

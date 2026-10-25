@@ -3,6 +3,8 @@ Request and response shapes of the /api/analyse routes, matching the frontend co
 (webapp/frontend/README.md). Pydantic validates them, so a malformed request gets a clear error.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -16,6 +18,16 @@ class RunMetadata(BaseModel):
 class TextRequest(RunMetadata):
     """The JSON body of /api/analyse/text."""
     text: str = Field(min_length=1, pattern=r"\S")   # at least one non-space character
+
+
+class LiveRequest(RunMetadata):
+    """The JSON body of /api/analyse/live."""
+    source: Literal["loopback", "microphone"] = "loopback"
+
+
+class StopRequest(BaseModel):
+    """The JSON body of /api/analyse/live/stop."""
+    run_id: str
 
 
 class SegmentOut(BaseModel):

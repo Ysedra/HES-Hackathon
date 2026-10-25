@@ -36,6 +36,7 @@ dependencies = [
     "trafilatura==2.3.1",
     "pysbd>=0.3.4",
     "fastapi[standard]>=0.159.1",
+    "text2num>=3.1.0",
 ]
 
 [dependency-groups]

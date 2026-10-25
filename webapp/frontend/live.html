@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Live fact-checking of what your computer is playing.">
+<title>Veriflow · Live</title><link rel="stylesheet" href="live.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="live.html"><span class="brand-icon" aria-hidden="true">✓</span>veriflow</a>
+  <span id="status" class="status" role="status">Connecting…</span>
+  <span id="counts" class="counts" hidden></span>
+  <button id="toggle" class="toggle" type="button" disabled>Start listening</button>
+</header>
+
+<div class="legend" aria-label="Colour legend">
+  <span><i class="dot checking"></i>Checking</span>
+  <span><i class="dot supported"></i>Supported</span>
+  <span><i class="dot contradicted"></i>Contradicted</span>
+  <span><i class="dot uncertain"></i>Uncertain</span>
+  <span><i class="dot not_checked"></i>Could not check</span>
+  <a class="workspace-link" href="./">Experiment workspace ↗</a>
+</div>
+<div id="sourceNote" class="source-note" role="note" hidden></div>
+
+<main class="layout">
+  <section class="transcript-panel" aria-label="Live transcript">
+    <div id="notice" class="notice" role="alert" hidden></div>
+    <div id="transcript" class="transcript" aria-live="polite"></div>
+  </section>
+  <aside id="detail" class="detail" aria-live="polite"></aside>
+</main>
+
+<script src="live.js" defer></script>
+</body>
+</html>

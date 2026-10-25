@@ -42,6 +42,7 @@ h2{font-size:11px;color:#8c9aa0;font-weight:650;display:flex;gap:10px;align-item
 .mic-button[aria-pressed=true]{background:#fff0ef;color:var(--red);border-color:#eab9b5;animation:recordPulse 1.5s infinite}
 @keyframes recordPulse{50%{box-shadow:0 0 0 8px #fff0ef}}
 .mic-area strong{font-size:14px;font-weight:650}.mic-area p{font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0}.recording-clock{font-variant-numeric:tabular-nums;font-size:12px;color:var(--red);margin-top:7px}
+.live-area{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;margin:0 20px 18px}.live-area p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;max-width:300px}#liveButton[aria-pressed="true"]{border-color:var(--red);color:var(--red)}
 .input-divider{display:flex;align-items:center;gap:10px;color:#8a999f;font-size:10px;margin:0 20px 15px}.input-divider:before,.input-divider:after{content:"";height:1px;background:var(--line);flex:1}
 #textForm{padding:0 20px}textarea{display:block;width:100%;border:1px solid var(--line);background:#fafcfc;border-radius:8px;resize:vertical;min-height:90px;padding:12px;color:var(--ink);font-size:12px;line-height:1.7}textarea::placeholder{color:#87979e}
 .input-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:11px}.input-actions>span{font-size:10px;color:var(--muted);max-width:130px}.input-actions .button{font-size:11px;padding:9px 12px}

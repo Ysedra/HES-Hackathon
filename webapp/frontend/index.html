@@ -8,7 +8,7 @@
 <body>
 <header class="topbar">
   <a class="brand" href="./"><span class="brand-icon" aria-hidden="true">✓</span>veriflow<small>HES-SO / 301 · 302</small></a>
-  <span class="header-note">Local models. Traceable evidence.</span>
+  <span class="header-note">Local models. Traceable evidence. <a href="live.html">Open the live view ↗</a></span>
   <span class="connection" id="connectionStatus" role="status">Checking backend…</span>
 </header>
 <main>
@@ -33,6 +33,10 @@
         <strong id="micTitle">Have something to fact-check?</strong>
         <p id="micHint">Click the microphone, speak a few sentences,<br>then stop to send them to the local pipeline.</p>
         <span id="recordingClock" class="recording-clock" hidden>00:00 / 01:00</span>
+      </div>
+      <div class="live-area">
+        <button id="liveButton" class="button secondary" type="button" aria-pressed="false">● Listen live to computer audio</button>
+        <p id="liveHint">Play a video, then listen: Kroko transcribes the computer's sound while it plays and each claim is checked at once. Best with V4.</p>
       </div>
       <div class="input-divider"><span>or start with text</span></div>
       <form id="textForm">
