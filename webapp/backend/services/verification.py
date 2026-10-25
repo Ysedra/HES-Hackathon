@@ -6,11 +6,14 @@ Retrieval failure gives "retrieval_failed"; only usable but inconclusive evidenc
 "uncertain". The pipeline displays retrieval failures as "Not checked".
 """
 
+import html
 import re
 import threading
 import time
-from urllib.parse import unquote
+from concurrent.futures import ThreadPoolExecutor, wait
+from urllib.parse import quote, unquote
 
+import requests
 import torch
 from ddgs import DDGS
 from trafilatura import extract, fetch_url
@@ -31,6 +34,15 @@ SOURCE_POLICIES = {
     "wikipedia_first": SEARCH_PROVIDERS,
     "wikipedia_only": ("wikipedia",),
 }
+# Wikipedia is searched through its own API: free, no key, and full-text (ddgs's "wikipedia"
+# backend only matches page titles, so a whole sentence found nothing). Wikipedia asks API
+# clients to name themselves in the User-Agent.
+WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
+WIKIPEDIA_HEADERS = {"User-Agent": "HES-Hackathon-Veriflow/0.1 (student fact-checking prototype; HES-SO)"}
+WIKIPEDIA_TIMEOUT_S = 5
+# The providers are asked at the same time; one that hasn't answered after this long is skipped
+# (a blocked provider can otherwise hold every check for its whole 10 s timeout).
+SEARCH_DEADLINE_S = 4
 PAGE_DOWNLOAD_CONFIG = use_config()
 PAGE_DOWNLOAD_CONFIG.set("DEFAULT", "DOWNLOAD_TIMEOUT", "8")
 
@@ -175,8 +187,26 @@ def content_words(text):
     return set(re.findall(r"\w+", text.lower())) - STOPWORDS
 
 
+def search_wikipedia(query, max_results=2):
+    """Full-text search of English Wikipedia, in the result shape of ddgs (title, href, body)."""
+    response = requests.get(WIKIPEDIA_API, headers=WIKIPEDIA_HEADERS, timeout=WIKIPEDIA_TIMEOUT_S, params={
+        "action": "query", "list": "search", "srsearch": query, "srlimit": max_results,
+        "srprop": "snippet", "format": "json", "formatversion": 2,
+    })
+    response.raise_for_status()
+    results = []
+    for page in response.json().get("query", {}).get("search", []):
+        title = page["title"]
+        snippet = html.unescape(re.sub(r"<[^>]+>", "", page.get("snippet", "")))   # drops <span class="searchmatch">
+        results.append({"title": title, "body": snippet,
+                        "href": "https://en.wikipedia.org/wiki/" + quote(title.replace(" ", "_"))})
+    if not results:
+        raise RuntimeError("No results found.")
+    return results
+
+
 def search_web(claim, source_policy="wikipedia_first"):
-    """Search providers in a fixed order and return diverse, de-duplicated results.
+    """Search the providers (all at once) and return diverse, de-duplicated results in a fixed order.
 
     One result is taken from each provider before a second result is considered. This stops
     the first provider from silently consuming the whole result budget and makes runs easier
@@ -192,15 +222,26 @@ def search_web(claim, source_policy="wikipedia_first"):
     if providers is None:
         raise ValueError(f"Unknown source policy: {source_policy}")
 
+    def ask(provider, query):
+        if provider == "wikipedia":
+            return search_wikipedia(query)
+        return list(DDGS(timeout=10).text(query, backend=provider, max_results=2) or [])
+
     hits_by_provider = {provider: [] for provider in providers}
     notes = []
     for query in queries:
-        for provider in providers:
-            try:
-                found = list(DDGS(timeout=10).text(query, backend=provider, max_results=2) or [])
-                hits_by_provider[provider].extend(found)
-            except Exception as error:
-                notes.append(f"{provider} search failed for {query!r}: {error}")
+        # All providers at once: the search takes as long as the slowest answer, not the sum
+        pool = ThreadPoolExecutor(max_workers=len(providers))
+        futures = {provider: pool.submit(ask, provider, query) for provider in providers}
+        wait(futures.values(), timeout=SEARCH_DEADLINE_S)
+        pool.shutdown(wait=False)   # a provider still waiting finishes in the background, unused
+        for provider, future in futures.items():   # the fixed provider order is kept
+            if not future.done():
+                notes.append(f"{provider} search timed out for {query!r} after {SEARCH_DEADLINE_S} s")
+            elif future.exception() is not None:
+                notes.append(f"{provider} search failed for {query!r}: {future.exception()}")
+            else:
+                hits_by_provider[provider].extend(future.result())
         if any(hits_by_provider.values()):
             break
 

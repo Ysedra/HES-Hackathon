@@ -5,6 +5,7 @@ The pipeline: runs the services in order for one request (v0, from pipeline_v0.i
 
 Every input becomes a stream of transcript segments, so the rest of the pipeline is the same:
 - media (an uploaded file or a microphone recording from the browser): transcribed by Whisper
+- live (the sound of the computer, loopback): transcribed by Kroko while it plays, until stopped
 - text: already a transcript, so it is one segment
 
 run_*() are generators of (type, data) events, in the frontend's event format, so each segment
@@ -38,7 +39,10 @@ from services.verification import (EVIDENCE_STRENGTH_THRESHOLD, MODEL_VERSION, V
 from versions import Version
 
 log = logging.getLogger("pipeline")
-CACHE_MODEL_VERSION = f"v1-exact:web-r2:{MODEL_VERSION}"
+# web-r3: Wikipedia is searched through its own API (verification.search_wikipedia), so verdicts
+# cached with the older search (web-r2) are not reused. The evidence cache keeps web-r2: its
+# rows are page sentences, which don't depend on how the page was found.
+CACHE_MODEL_VERSION = f"v1-exact:web-r3:{MODEL_VERSION}"
 EVIDENCE_CACHE_VERSION = f"v3-fts:web-r2:{MODEL_VERSION}"
 
 Event = tuple[str, dict]
@@ -72,6 +76,8 @@ class Pipeline:
         # Intel Macs must keep CTranslate2 and PyTorch in separate processes because their
         # wheels bundle competing copies of libiomp5. The child is started only for media.
         self.whisper = None if transcription.needs_isolated_worker() else transcription.load_model()
+        self.kroko = None   # the live model, loaded at the first live run
+        self._kroko_lock = threading.Lock()
         self.verifier = Verifier()
         storage.init_db()
         storage.init_claim_cache()
@@ -84,6 +90,23 @@ class Pipeline:
 
     def run_text(self, version: Version, run_id: str, text: str) -> Run:
         return self._run(version, run_id, "text input", [transcription.Segment(0, 0, text.strip())])
+
+    def run_live(self, version: Version, run_id: str, stop: threading.Event, source="loopback",
+                 partials=False) -> Run:
+        """Transcribe the computer's sound with Kroko and check its claims until stop is set.
+        partials=True also sends the unfinished sentence ("transcript.partial", for live.html).
+        stop is also set when the run ends for any other reason (error, closed tab), so the
+        capture never keeps the audio device open. V4 suits it best: the sequential versions
+        stop reading the transcript while they check a claim, so the text falls behind."""
+        try:
+            with self._kroko_lock:
+                if self.kroko is None:
+                    log.info("loading Kroko...")
+                    self.kroko = transcription.load_kroko()
+            segments = transcription.transcribe_live_kroko(self.kroko, stop, source, partials)
+            yield from self._run(version, run_id, f"live {source}", segments)
+        finally:
+            stop.set()
 
     def _run(self, version, run_id, source_url, segments: Iterable[transcription.Segment]) -> Run:
         started = time.perf_counter()
@@ -117,8 +140,9 @@ class Pipeline:
 
     def _claims(self, con, source_id, segments):
         """Save each segment and find the checkable sentences it completes. Yields the
-        ("transcript.segment", data) events, and ("claim", (claim_id, claim, sentence, stable_at))
-        for each new claim, already stored as "checking"."""
+        ("transcript.segment", data) events, ("claim", (claim_id, claim, sentence, stable_at))
+        for each new claim, already stored as "checking", ("pause", None) for each live Pause,
+        and ("transcript.partial", data) for each live Partial."""
         assembler = extraction.SentenceAssembler()
         seen_claims = set()   # one verification per normalized sentence for the entire run
 
@@ -138,7 +162,16 @@ class Pipeline:
                                  segment_ids=[f"segment-{i}" for i in dict.fromkeys(sentence.segment_ids)])
                 yield "claim", (claim_id, claim, sentence, stable_at)
 
-        for segment in segments:   # media: Whisper runs here, window by window
+        for segment in segments:   # media: Whisper runs here, window by window; live: Kroko
+            if isinstance(segment, transcription.Pause):
+                # Live: the sentence is finished or the speaker paused. pysbd keeps the last
+                # sentence until the next one starts, which can take many seconds live.
+                yield from claims_in(assembler.flush())
+                yield "pause", None
+                continue
+            if isinstance(segment, transcription.Partial):   # not stored: only shown until the sentence ends
+                yield "transcript.partial", {"start_ms": segment.start_ms, "text": segment.text}
+                continue
             segment_id = storage.save_segment(con, source_id, segment)
             log.info("segment %d [%d-%d ms]: %s", segment_id, segment.start_ms, segment.end_ms, segment.text)
             yield "transcript.segment", SegmentOut(id=f"segment-{segment_id}", start_ms=segment.start_ms,
@@ -154,9 +187,13 @@ class Pipeline:
         n_segments = 0
         try:
             for type_, data in self._claims(con, source_id, segments):
-                if type_ == "transcript.segment":
-                    n_segments += 1
+                if type_ in ("transcript.segment", "transcript.partial"):
+                    n_segments += type_ == "transcript.segment"
                     yield type_, data
+                    continue
+                if type_ == "pause":   # live: an event now and then, so a closed browser is noticed
+                    yield "metrics.update", latency_metrics(claims, cache_con is not None,
+                                                            evidence_enabled=evidence_cache is not None)
                     continue
                 claim_id, claim, sentence, stable_at = data
                 yield "claim.update", claim.model_dump()   # shown as "Checking" while the search runs
@@ -176,7 +213,7 @@ class Pipeline:
         cache misses go to a pool of version.workers threads for the fresh check. Both put their
         results on one queue, which this generator empties, so each verdict is sent as soon as it
         is ready, even while Whisper works on the next window. Returns the number of segments."""
-        results = queue.Queue()   # (kind, data); kinds: event, hit, submitted, checked, produced, error
+        results = queue.Queue()   # (kind, data); kinds: event, tick, hit, submitted, checked, produced, error
         stop = threading.Event()   # set when the run ends early: the producer stops after its current step
         executor = ThreadPoolExecutor(max_workers=version.workers)
 
@@ -195,8 +232,11 @@ class Pipeline:
                 for type_, data in self._claims(producer_con, source_id, segments):
                     if stop.is_set():
                         return
-                    if type_ == "transcript.segment":
+                    if type_ in ("transcript.segment", "transcript.partial"):
                         results.put(("event", (type_, data)))
+                        continue
+                    if type_ == "pause":
+                        results.put(("tick", None))
                         continue
                     claim_id, claim, sentence, stable_at = data
                     results.put(("event", ("claim.update", claim.model_dump())))   # "Checking"
@@ -229,6 +269,9 @@ class Pipeline:
                 elif kind == "event":
                     n_segments += data[0] == "transcript.segment"
                     yield data
+                elif kind == "tick":   # live Pause: an event now and then, so a closed browser is noticed
+                    yield "metrics.update", latency_metrics(claims, "claims" in version.caches,
+                                                            queue_size=pending)
                 else:   # a verdict: "hit" from the cache or "checked" by a worker
                     pending -= kind == "checked"
                     claims.append(data)
