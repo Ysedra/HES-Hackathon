@@ -417,7 +417,10 @@ def transcribe_live_kroko(recognizer, stop: threading.Event, source="loopback",
             log.info("live capture (%s) from %s", kind, device)
             # blocksize = 1 s: Windows keeps 1 s of audio while this thread is busy.
             # The default (~10 ms) lost audio ("data discontinuity in recording").
-            with device.recorder(samplerate=SAMPLE_RATE, blocksize=SAMPLE_RATE) as recorder:
+            # On macOS blocksize means something else and must be small (5-320 on one Mac),
+            # so 1 s gives a TypeError there: we use the default of the device.
+            blocksize = SAMPLE_RATE if sys.platform == "win32" else None
+            with device.recorder(samplerate=SAMPLE_RATE, blocksize=blocksize) as recorder:
                 while not stop.is_set():
                     chunk = recorder.record(numframes=int(SAMPLE_RATE * CAPTURE_CHUNK_S))
                     chunks.put(chunk.mean(axis=1))   # mono

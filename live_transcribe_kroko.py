@@ -33,6 +33,7 @@ Run from the root folder:  uv run python live_transcribe_kroko.py
 Stop with Ctrl+C.
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -169,7 +170,10 @@ def main():
     line_open = False
     # blocksize = 1 s of audio: the Windows buffer keeps 1 s while the model works.
     # The default is only about 10 ms, so audio was lost ("data discontinuity in recording").
-    with source.recorder(samplerate=SAMPLERATE, blocksize=SAMPLERATE) as recorder:
+    # On macOS blocksize means something else and must be small (5-320 on one Mac),
+    # so 1 s gives a TypeError there: we use the default of the device.
+    blocksize = SAMPLERATE if sys.platform == "win32" else None
+    with source.recorder(samplerate=SAMPLERATE, blocksize=blocksize) as recorder:
         try:
             while True:
                 chunk = read_chunk(recorder)
